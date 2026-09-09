@@ -11,8 +11,11 @@ const isActive = (href: string) =>
 ---
 <header class="site-header">
   <div class="page bar">
-    <a href="/" class="brand" aria-label="דף הבית">
-      <span class="brand-mark" aria-hidden="true">ort<span>·</span>hr</span>
+    <a href="/" class="brand" aria-label="URSA GROUP — דף הבית">
+      <picture>
+        <source srcset="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
+        <img src="/ursa-logo.png" alt="URSA GROUP" class="brand-logo" width="140" height="40" />
+      </picture>
     </a>
     <nav aria-label="ניווט ראשי">
       <ul>
@@ -40,7 +43,8 @@ const isActive = (href: string) =>
     display: flex; align-items: center; gap: 20px;
     min-block-size: 64px;
   }
-  .brand { text-decoration: none; margin-inline-end: auto; }
+  .brand { text-decoration: none; margin-inline-end: auto; display: inline-flex; align-items: center; }
+  .brand-logo { height: 34px; width: auto; display: block; }
   .brand-mark {
     font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--ink);
   }

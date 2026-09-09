@@ -30,13 +30,13 @@ const jsonLd = {
   employmentType: job.employment_scope ?? undefined,
   hiringOrganization: job.company_name
     ? { '@type': 'Organization', name: job.company_name }
-    : { '@type': 'Organization', name: 'ort·hr' },
+    : { '@type': 'Organization', name: 'URSA GROUP' },
   jobLocation: job.location
     ? { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: job.location, addressCountry: 'IL' } }
     : undefined,
 };
 ---
-<Base title={`${job.title} — ort·hr`} description={job.body.slice(0, 155)} jsonLd={jsonLd}>
+<Base title={`${job.title} — URSA GROUP`} description={job.body.slice(0, 155)} jsonLd={jsonLd}>
   <div class="page wrap">
     <nav class="crumbs" aria-label="מיקום">
       <a href="/jobs">משרות</a> <span aria-hidden="true">›</span> <span>{job.title}</span>

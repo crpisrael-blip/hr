@@ -1,20 +1,22 @@
 :root {
-  --surface: #f4f5f3; --card: #ffffff; --sunk: #eceee9; --line: #dfe1db; --line-strong: #c7cabf;
-  --ink: #171b21; --ink-mid: #4c5461; --ink-soft: #737b88;
-  --brand: #0f5b57; --brand-hover: #0b423f; --brand-soft: #e2efed; --brand-ink: #093633;
-  --accent: #b8551f; --accent-soft: #fbeade;
+  /* מותג URSA GROUP: נייבי #080838, תכלת #90c0f8 */
+  --surface: #f2f5fb; --card: #ffffff; --sunk: #e9eef7; --line: #dbe1ee; --line-strong: #c2cbdd;
+  --ink: #080838; --ink-mid: #454b6b; --ink-soft: #737a96;
+  --brand: #16165e; --brand-hover: #0a0a3a; --brand-soft: #e7eefb; --brand-ink: #080838;
+  --accent: #90c0f8; --accent-soft: #eaf3fe; --accent-ink: #08103a;
   --ok: #1c7a4a; --ok-soft: #e2f2e9; --warn: #9a6a12; --warn-soft: #f8efd8;
-  --focus: #1f6feb; --radius: 9px; --radius-sm: 6px;
-  --shadow-sm: 0 1px 2px rgba(23,27,33,.06); --shadow-md: 0 4px 16px rgba(23,27,33,.09);
+  --focus: #2f6fed; --radius: 9px; --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(8,8,56,.07); --shadow-md: 0 4px 16px rgba(8,8,56,.10);
   --font: "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --surface:#101317; --card:#191d22; --sunk:#0c0f12; --line:#282d34; --line-strong:#3a4048;
-    --ink:#eceef1; --ink-mid:#a8b0bb; --ink-soft:#7f8792;
-    --brand:#4fb3aa; --brand-hover:#6bc7bf; --brand-soft:#123330; --brand-ink:#b8e5e0;
-    --accent:#e2854f; --accent-soft:#33200f; --ok:#4ab87b; --ok-soft:#12291d; --warn:#d6a441; --warn-soft:#2c2410;
+    --surface:#0a0c18; --card:#121529; --sunk:#080a14; --line:#232842; --line-strong:#363c5c;
+    --ink:#eef1f8; --ink-mid:#aab2cc; --ink-soft:#7f87a3;
+    --brand:#90c0f8; --brand-hover:#aed3fb; --brand-soft:#12244a; --brand-ink:#cfe3fd;
+    --accent:#90c0f8; --accent-soft:#12244a; --accent-ink:#cfe3fd;
+    --ok:#4ab87b; --ok-soft:#12291d; --warn:#d6a441; --warn-soft:#2c2410;
     color-scheme: dark;
   }
 }

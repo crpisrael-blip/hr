@@ -16,7 +16,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="side">
-        <div className="brand">ort<span>·</span>hr</div>
+        <div className="brand">
+          <picture>
+            <source srcSet="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
+            <img src="/ursa-logo.png" alt="URSA GROUP" className="brand-logo" />
+          </picture>
+        </div>
         <nav>
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} end={n.end}
@@ -47,8 +52,8 @@ const css = `
 .app-shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
 .side { position: sticky; top: 0; height: 100vh; background: var(--card); border-inline-start: 1px solid var(--line);
   display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; }
-.brand { font-weight: 700; font-size: 1.25rem; padding: 8px 12px 16px; letter-spacing: -.02em; }
-.brand span { color: var(--brand); }
+.brand { padding: 6px 12px 16px; }
+.brand-logo { height: 30px; width: auto; display: block; }
 .side nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm);
   color: var(--ink-mid); text-decoration: none; font-weight: 500; }

@@ -18,7 +18,10 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="card login" onSubmit={onSubmit}>
-        <div className="brand">ort<span>·</span>hr</div>
+        <picture>
+          <source srcSet="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
+          <img src="/ursa-logo.png" alt="URSA GROUP" style={{ height: 38, width: 'auto', marginInline: 'auto' }} />
+        </picture>
         <h1>ניהול הגיוס</h1>
         <p className="sub">כניסה לצוות החברה</p>
         <label><span className="lbl">דוא״ל</span>
@@ -33,8 +36,7 @@ export default function Login() {
         .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px;
           background: radial-gradient(120% 90% at 100% 0, var(--brand-soft) 0, var(--surface) 55%); }
         .login { width: 100%; max-width: 380px; padding: 32px; display: grid; gap: 14px; }
-        .login .brand { font-weight: 700; font-size: 1.4rem; }
-        .login .brand span { color: var(--brand); }
+        
         .login h1 { font-size: 1.3rem; margin-top: 6px; }
         .login .sub { color: var(--ink-mid); margin-bottom: 6px; }
       `}</style>

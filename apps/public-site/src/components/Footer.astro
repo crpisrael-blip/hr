@@ -4,7 +4,10 @@ const year = new Date().getFullYear();
 <footer class="site-footer">
   <div class="page grid">
     <div>
-      <span class="brand-mark" aria-hidden="true">ort·hr</span>
+      <picture>
+        <source srcset="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
+        <img src="/ursa-logo.png" alt="URSA GROUP" style="height:36px;width:auto" />
+      </picture>
       <p class="tagline measure">משרדי גיוס והשמה. מחברים בין אנשים למקומות שבהם הם יעשו את העבודה הטובה ביותר שלהם.</p>
     </div>
     <nav aria-label="ניווט תחתון">
@@ -24,7 +27,7 @@ const year = new Date().getFullYear();
     </nav>
   </div>
   <div class="page legal">
-    <p>© {year} ort·hr. כל הזכויות שמורות.</p>
+    <p>© {year} URSA GROUP. כל הזכויות שמורות.</p>
   </div>
 </footer>
 
