@@ -1,6 +1,11 @@
 node_modules/
-.wrangler/
-.dev.vars
 dist/
+.output/
+.astro/
+.wrangler/
+.env
+.env.*
+!.env.example
 .DS_Store
 *.log
+supabase/.temp/

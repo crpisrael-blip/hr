@@ -1,0 +1,11 @@
+{
+  "name": "hr",
+  "private": true,
+  "version": "0.1.0",
+  "description": "מערכת גיוס והשמה: אתר ציבורי, אזור אישי למועמדים וממשק חברה",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "db:test": "./scripts/db-test.sh"
+  },
+  "engines": { "node": ">=20" }
+}
