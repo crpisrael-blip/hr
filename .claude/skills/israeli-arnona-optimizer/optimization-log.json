@@ -1,0 +1,42 @@
+{
+  "cycles": [
+    {
+      "version": "1.5.0",
+      "date": "2026-08-19",
+      "lessons": [
+        "STRUCTURAL ROOT CAUSE: the skill covered 11 of the regulation's rows because the domain-checklist carried ONE line reading 'discount eligibility with CORRECT bands'. Every gate then verified the eleven rows it did list and found nothing wrong. The checklist now enumerates each statutory paragraph as its own row, which is the only thing that makes a missing row visible.",
+        "FABRICATION FIXED: scripts/arnona-calculator.py hardcoded student 50% and large-family 30%, figures the prose itself declined to state as unverifiable. Neither has any paragraph in the regulation. Both keys removed rather than re-sourced. low-income was a flat 80% with no band structure; it is now the top band with a --discount-percentage override. soldier had max_sqm 100 against a statutory 70/90.",
+        "CEILING VS ENTITLEMENT: almost every Regulation 2 row reads 'a council MAY set a discount not exceeding X'. The skill had been presenting these as amounts owed. Every row now carries kind=ceiling or kind=entitlement and prints it.",
+        "CARRY RESOLVED from v1.3.0: the 2026 per-capita income thresholds were deferred as 'not assertable without fabrication'. They are published in the regulation's own First Schedule and are now encoded in full, all nine household sizes, four columns, plus the per-person increments for 10+ and the 20-May minimum-wage update rule.",
+        "REFUTED at source, from the incoming audit brief: Reg. 2(4) does NOT list prison-service disabled or hostile-action casualties. Those sit at Reg. 14e(2)(e) and (f) as a two-thirds ENTITLEMENT, a materially better route than the 66% ceiling they were attributed to. Reg. 2(4) instead carries Austrian OFG and Belgian 1954 pensions, which the brief did not mention. Also the senior small-business discount is Reg. 14c, not 14d (14d is the Chapter Hey2 definitions section).",
+        "FOUND UNREPORTED: Reg. 14e1 hostage and missing-person 100% entitlement (added 5784); Reg. 3d shmita agricultural land 90-100%; Reg. 14 new-industry unemployment-banded table; Reg. 22a the new budget-deficit bar on granting discounts at all; the Senior Citizens Law s.9(c)(4) 150%-of-average-wage test where several seniors share a flat, and its s.9(d) automatic-renewal-to-70 rule.",
+        "EVIDENCE: he.wikisource consolidated statute pages are curl-readable with digits in the text layer and match --check-sources verbatim. Prefer them over kolzchut restatements, which are Cloudflare-blocked and forced twelve entries into verified_via=playwright. Eleven of those remain and should migrate to statutory sources next cycle.",
+        "Deferred (MINOR): the calculator still models only the residential 45% limb of Reg. 3c, not the 39% other-property limb. Add a usage-aware rate for that row next cycle.",
+        "Deferred (MINOR): rate tables in RATE_TABLES are still described as approximate and are not traced to any tzav arnona. They are the last unsourced numbers in the skill."
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-07-20",
+      "lessons": [
+        "FACT FIX: national average wage used for the senior 30% income-tested band was 13,623; the Jan-2026 BTL basic average wage is 13,566 (13,769 for section 2). Corrected in the discounts guide + evidence.",
+        "COVERAGE (MAJOR): the 2026 income-test reform (effective 1 Jan 2026) was missing. Income-tested discounts now use the 12-month average income only (3-month option removed), a per-capita threshold table indexed to the minimum wage + household size, exclude some BTL benefits, and widened eligibility ~740k->840k households (top band still 90%). Added the reform note to SKILL.md + SKILL_HE.md and flagged the guide's low-income table as indicative pre-reform; deliberately did NOT assert specific 2026 per-capita NIS thresholds (route to the annual Ministry-of-Interior table) to avoid fabrication.",
+        "COVERAGE (MAJOR): added three missing named categories: income-support (havtachat hachnasa) recipient up to 70%, hardship (nazak) committee up to 70% under Regulation 7, and reserve-duty (miluim) municipality-administered relief. income-support + nazak added to the calculator; miluim kept documentation-only (no citable national rate, so no fabricated calculator percentage).",
+        "COVERAGE (MINOR): documented the empty-property once-per-ownership limit and the Section 330 uninhabitable-building exemption in the guide.",
+        "Confirmed current for 2026: arnona update coefficient 1.626%; oleh 90%/100sqm/12-of-24-months; disabled 40%/80% bands; hasaga 90/60/30-day deadlines. All Reference Links resolve (gov.il + jerusalem.muni 403 to curl but live in browser).",
+        "Deferred (MINOR): evacuee/war-affected (mefunim) transient relief not added (time-bound, lowest priority); a per-municipality current per-capita table would need a live scrape each cycle."
+      ]
+    },
+    {
+      "version": "1.2.1",
+      "date": "2026-06-07",
+      "lessons": [
+        "CRITICAL legal-deadline fix: the EN SKILL.md said the arnona objection (hasaga) deadline is 120 days; the correct figure is 90 days per the 1976 objection law (the HE file was already correct at 90, so this was an EN/HE inconsistency). Fixed 4 EN occurrences.",
+        "Three MAJOR eligibility-band errors, all duplicated in the calculator script: (1) disabled bands were 50-74%/75-100% but the real regulation is medical-disability 90%+ -> 40% and earning-incapacity 75%+ -> up to 80% (no 50-74% band); (2) senior/elderly was framed by age (65-69/70+) but is actually by pension/income status (25% pension recipient, 30% income-tested <= avg wage, 100% with income supplement); (3) oleh discount is 12 months chosen within the first 24 months, not the first 12. Renamed the script discount keys to senior-pension/senior-income/senior-supplement/disabled-medical/disabled-incapacity.",
+        "Fixed invalid example commands: SKILL.md used --zone A for Tel Aviv, but TA uses numeric zones 1-4; changed to --zone 2.",
+        "Added the 2026 national arnona update coefficient (1.626%) to the rates guide; large-family discount reframed as income-tested up to ~30%; student noted as municipality-dependent (~50%).",
+        "Built evidence.json from scratch (legacy skill)."
+      ]
+    }
+  ]
+}
