@@ -18,6 +18,7 @@ import Tasks from './pages/Tasks';
 import Placements from './pages/Placements';
 import PlacementNew from './pages/PlacementNew';
 import PlacementDetail from './pages/PlacementDetail';
+import Soon from './pages/Soon';
 
 export default function App() {
   const { session, employee, loading } = useAuth();
@@ -54,6 +55,9 @@ export default function App() {
         <Route path="/placements" element={<Placements />} />
         <Route path="/placements/new" element={<PlacementNew />} />
         <Route path="/placements/:id" element={<PlacementDetail />} />
+        <Route path="/reports" element={<Soon title="דוחות" />} />
+        <Route path="/calendar" element={<Soon title="לוח שנה" />} />
+        <Route path="/settings" element={<Soon title="הגדרות" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
