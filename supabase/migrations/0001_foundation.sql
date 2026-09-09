@@ -13,6 +13,8 @@ begin
   if to_regclass('auth.users') is null then
     create schema if not exists auth;
     create table auth.users (id uuid primary key);
+    -- stub ל-auth.uid() כדי שמדיניות RLS תרוץ גם על Postgres נקי לבדיקות.
+    execute $fn$ create function auth.uid() returns uuid language sql stable as 'select null::uuid' $fn$;
   end if;
 end $$;
 
