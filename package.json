@@ -5,6 +5,7 @@
   "description": "מערכת גיוס והשמה: אתר ציבורי, אזור אישי למועמדים וממשק חברה",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
+    "build": "npm run build --workspace=@hr/team-app",
     "db:test": "./scripts/db-test.sh"
   },
   "engines": { "node": ">=20" }
