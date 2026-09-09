@@ -5,9 +5,16 @@ create schema if not exists app;
 create schema if not exists finance;
 create schema if not exists audit;
 
--- ב-Supabase הסכמה auth כבר קיימת. ההגדרה כאן מאפשרת להריץ את המיגרציות גם על Postgres נקי.
-create schema if not exists auth;
-create table if not exists auth.users (id uuid primary key);
+-- ב-Supabase הסכמה auth וטבלת auth.users כבר קיימות ושייכות לרול אחר,
+-- שאין ל-SQL Editor הרשאה ליצור בו. לכן יוצרים stub רק כשהטבלה חסרה
+-- (כלומר על Postgres נקי לבדיקות), ומדלגים לגמרי על Supabase.
+do $$
+begin
+  if to_regclass('auth.users') is null then
+    create schema if not exists auth;
+    create table auth.users (id uuid primary key);
+  end if;
+end $$;
 
 create extension if not exists pgcrypto;
 
