@@ -34,7 +34,8 @@ export async function loadJobs(): Promise<Job[]> {
   }
 
   const { default: postgres } = await import('postgres');
-  const sql = postgres(url, { max: 1, idle_timeout: 5 });
+  // ssl require ו-prepare:false מתאימים ל-Supabase pooler (session/transaction כאחד).
+  const sql = postgres(url, { max: 1, idle_timeout: 5, prepare: false, ssl: 'require' });
   try {
     const rows = await sql<Job[]>`
       select slug, title, body, location, employment_scope, company_name, published_at
