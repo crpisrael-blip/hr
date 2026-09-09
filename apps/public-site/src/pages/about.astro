@@ -1,0 +1,41 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../data/site';
+---
+<Base title="עלינו — ORT Tech" description="מי אנחנו וכיצד אנחנו עובדים. חברת גיוס והשמה עם יחס אישי ותהליך שקוף.">
+  <div class="page wrap stack" style="--gap: 28px">
+    <header class="stack" style="--gap: 12px">
+      <span class="eyebrow">עלינו</span>
+      <h1>גיוס שמתחיל מהתאמה, לא מקורות חיים</h1>
+      <p class="lead measure">
+        {SITE.shortName} היא חברת גיוס והשמה. אנחנו מלווים מועמדים ומעסיקים לאורך כל הדרך,
+        מהמשרה הראשונה ועד היום הראשון בעבודה, עם יחס אישי ותהליך שקוף.
+      </p>
+    </header>
+
+    <div class="values">
+      <div class="v"><h3>יחס אישי</h3><p>מגייס אחד מלווה אתכם לאורך התהליך ומכיר את התיק שלכם.</p></div>
+      <div class="v"><h3>שקיפות</h3><p>באזור האישי רואים בכל רגע באיזה שלב נמצאת כל מועמדות.</p></div>
+      <div class="v"><h3>מהירות</h3><p>זמן תגובה ממוצע של יום עבודה אחד מרגע ההגשה.</p></div>
+      <div class="v"><h3>דיסקרטיות</h3><p>הפרטים שלכם נשמרים ומשמשים לתהליך הגיוס בלבד.</p></div>
+    </div>
+
+    <section class="cta-band">
+      <div><h2>רוצים להתחיל?</h2><p>עברו על המשרות הפתוחות או השאירו פרטים.</p></div>
+      <a class="btn btn-primary" href="/jobs">לכל המשרות</a>
+    </section>
+  </div>
+</Base>
+<style>
+  .wrap { padding-block: 40px; }
+  .eyebrow { color: var(--brand); font-weight: 700; font-size: .9rem; }
+  .lead { color: var(--ink-mid); font-size: 1.08rem; }
+  .values { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .v { background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .v h3 { color: var(--brand); margin-block-end: 6px; }
+  .v p { color: var(--ink-mid); font-size: .95rem; }
+  .cta-band { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    background: var(--brand); color: #fff; border-radius: var(--radius); padding: 28px; }
+  .cta-band h2, .cta-band p { color: #fff; }
+  .cta-band .btn-primary { background: #fff; color: var(--brand-ink); }
+</style>

@@ -1,0 +1,104 @@
+---
+import { SITE } from '../data/site';
+interface Props { slug: string; jobTitle: string; }
+const { slug, jobTitle } = Astro.props;
+// נקודת הקצה להגשה: פונקציית שרת נפרדת, כתיבה בלבד. אין למסד גישה ישירה מהדפדפן.
+const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
+---
+<form class="apply" data-endpoint={endpoint} data-slug={slug} novalidate>
+  <input type="hidden" name="job_slug" value={slug} />
+  <!-- מלכודת בוטים. בני אדם לא ממלאים שדה מוסתר. -->
+  <input type="text" name="company_website" tabindex="-1" autocomplete="off" class="visually-hidden" aria-hidden="true" />
+
+  <div class="field">
+    <label class="label" for="full_name">שם מלא <span class="req">*</span></label>
+    <input type="text" id="full_name" name="full_name" required autocomplete="name" />
+  </div>
+
+  <div class="field">
+    <label class="label" for="phone">טלפון <span class="req">*</span></label>
+    <input type="tel" id="phone" name="phone" required inputmode="tel"
+           autocomplete="tel" pattern="[0-9+\-\s]{9,15}" placeholder="050-0000000" />
+    <span class="hint">נשתמש בטלפון כדי ליצור איתך קשר וכדי לזהות אותך באזור האישי.</span>
+  </div>
+
+  <div class="field">
+    <label class="label" for="email">דוא״ל</label>
+    <input type="email" id="email" name="email" autocomplete="email" placeholder="לא חובה" />
+  </div>
+
+  <div class="field">
+    <label class="label" for="cv">קורות חיים</label>
+    <input type="file" id="cv" name="cv" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+    <span class="hint">PDF או Word, עד 10MB. אפשר להגיש גם בלי לצרף.</span>
+  </div>
+
+  <label class="consent">
+    <input type="checkbox" name="data_use" required />
+    <span>אני מאשר/ת שימוש בפרטים שלי לצורך תהליך הגיוס, לפי <a href="/privacy">מדיניות הפרטיות</a>.</span>
+  </label>
+
+  <button type="submit" class="btn btn-accent submit">שליחת מועמדות</button>
+  <p class="form-status" role="status" aria-live="polite" hidden></p>
+</form>
+
+<script>
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const OK_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
+
+  document.querySelectorAll<HTMLFormElement>('form.apply').forEach(form => {
+    const status = form.querySelector<HTMLElement>('.form-status')!;
+    const submit = form.querySelector<HTMLButtonElement>('.submit')!;
+    const file = form.querySelector<HTMLInputElement>('#cv');
+    let sending = false;
+
+    function say(msg: string, kind: 'ok' | 'err' | 'info') {
+      status.hidden = false;
+      status.textContent = msg;
+      status.className = `form-status is-${kind}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (sending) return;                       // מונע כפילות מלחיצה כפולה
+      form.querySelectorAll('input').forEach(i => i.setAttribute('data-touched', ''));
+
+      if (!form.checkValidity()) { say('נא למלא את שדות החובה.', 'err'); return; }
+
+      if (file?.files?.length) {
+        const f = file.files[0];
+        if (f.size > MAX_BYTES) { say('הקובץ גדול מ-10MB. נסו קובץ קטן יותר.', 'err'); return; }
+        if (f.type && !OK_TYPES.includes(f.type)) { say('אפשר לצרף PDF או Word בלבד.', 'err'); return; }
+      }
+
+      sending = true; submit.disabled = true;
+      say('שולח…', 'info');
+      try {
+        const res = await fetch(form.dataset.endpoint!, { method: 'POST', body: new FormData(form) });
+        if (!res.ok) throw new Error(String(res.status));
+        form.reset();
+        say('קיבלנו את המועמדות שלך. ניצור קשר בהקדם.', 'ok');
+        submit.hidden = true;
+      } catch {
+        // כשל ברשת אינו מאבד את מה שהמשתמש הקליד; אפשר לנסות שוב.
+        say('משהו השתבש בשליחה. נסו שוב, או פנו אלינו בטלפון.', 'err');
+        sending = false; submit.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .apply { display: grid; gap: 15px; }
+  .req { color: var(--accent); }
+  .consent { display: flex; gap: 9px; align-items: start; font-size: .88rem; color: var(--ink-mid); line-height: 1.5; }
+  .consent input { margin-block-start: 3px; inline-size: auto; min-height: 0; }
+  .submit { inline-size: 100%; margin-block-start: 4px; }
+  .form-status { font-size: .92rem; font-weight: 600; padding: 10px 12px; border-radius: var(--radius-sm); }
+  .form-status.is-ok  { background: var(--brand-soft); color: var(--brand-ink); }
+  .form-status.is-err { background: var(--accent-soft); color: var(--accent); }
+  .form-status.is-info{ background: var(--surface-sunk); color: var(--ink-mid); }
+</style>

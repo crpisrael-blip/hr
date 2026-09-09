@@ -1,0 +1,160 @@
+/* מערכת עיצוב לאתר הציבורי. RTL-first, תכונות לוגיות בלבד. */
+
+:root {
+  /* משטחים: נייר חמים ולא אפור טכני */
+  --surface:      #fbfaf7;
+  --surface-card: #ffffff;
+  --surface-sunk: #f3f1ec;
+  --line:         #e3e0d8;
+  --line-strong:  #cdc8bd;
+
+  /* טקסט */
+  --ink:      #171b21;
+  --ink-mid:  #4c5461;
+  --ink-soft: #6e7684;
+
+  /* מותג: טורקיז עמוק. אמין, לא סטארטאפי */
+  --brand:       #0f5b57;
+  --brand-hover: #0b423f;
+  --brand-soft:  #e4efed;
+  --brand-ink:   #093633;
+
+  /* דגש חם לפעולות ולסימוני "חדש" */
+  --accent:      #b8551f;
+  --accent-soft: #fbeade;
+
+  --focus: #1f6feb;
+
+  --radius:    10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(23, 27, 33, .06);
+  --shadow-md: 0 2px 4px rgba(23, 27, 33, .06), 0 8px 24px rgba(23, 27, 33, .07);
+
+  --measure: 68ch;
+  --page:    1140px;
+
+  --font: "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface:      #14171b;
+    --surface-card: #1b1f24;
+    --surface-sunk: #101317;
+    --line:         #2b3037;
+    --line-strong:  #3d444d;
+    --ink:          #eceef1;
+    --ink-mid:      #a8b0bb;
+    --ink-soft:     #838c98;
+    --brand:        #4fb3aa;
+    --brand-hover:  #6bc7bf;
+    --brand-soft:   #123330;
+    --brand-ink:    #b8e5e0;
+    --accent:       #e2854f;
+    --accent-soft:  #331f14;
+    --focus:        #6aa5ff;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md: 0 2px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+h1 { font-size: clamp(1.6rem, 1.1rem + 2vw, 2.35rem); }
+h2 { font-size: clamp(1.25rem, 1rem + 1vw, 1.6rem); }
+h3 { font-size: 1.06rem; font-weight: 600; }
+p  { margin: 0; text-wrap: pretty; }
+
+a { color: var(--brand); text-underline-offset: 3px; }
+a:hover { color: var(--brand-hover); }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.page { max-width: var(--page); margin-inline: auto; padding-inline: 20px; }
+.stack > * + * { margin-block-start: var(--gap, 16px); }
+.measure { max-width: var(--measure); }
+
+.skip-link {
+  position: absolute; inset-block-start: -100px; inset-inline-start: 12px;
+  background: var(--brand); color: #fff; padding: 10px 16px;
+  border-radius: 0 0 var(--radius) var(--radius); z-index: 50;
+}
+.skip-link:focus { inset-block-start: 0; }
+
+/* ---------- כפתורים ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 10px 20px;
+  border-radius: var(--radius); border: 1px solid transparent;
+  font: inherit; font-weight: 600; cursor: pointer;
+  text-decoration: none; white-space: nowrap;
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease;
+}
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-hover); color: #fff; }
+.btn-accent  { background: var(--accent); color: #fff; }
+.btn-accent:hover { filter: brightness(.93); color: #fff; }
+.btn-quiet {
+  background: var(--surface-card); color: var(--ink);
+  border-color: var(--line-strong);
+}
+.btn-quiet:hover { background: var(--surface-sunk); color: var(--ink); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ---------- שדות ---------- */
+.field { display: block; }
+.field > .label { display: block; font-weight: 600; font-size: .9rem; margin-block-end: 6px; }
+.field .hint { display: block; color: var(--ink-soft); font-size: .82rem; margin-block-start: 5px; }
+input[type="text"], input[type="tel"], input[type="email"], input[type="search"],
+select, textarea, input[type="file"] {
+  inline-size: 100%; min-height: 44px;
+  padding: 10px 12px;
+  font: inherit; color: var(--ink);
+  background: var(--surface-card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+textarea { min-height: 110px; resize: vertical; }
+input:invalid[data-touched] { border-color: var(--accent); }
+
+.error-text { color: var(--accent); font-size: .87rem; font-weight: 600; }
+
+/* ---------- תגיות ---------- */
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: .78rem; font-weight: 600; line-height: 1.5;
+  background: var(--surface-sunk); color: var(--ink-mid);
+  border: 1px solid var(--line);
+}
+.tag-brand { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
+.tag-new   { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+.visually-hidden {
+  position: absolute; inline-size: 1px; block-size: 1px;
+  padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

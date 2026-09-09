@@ -1,0 +1,98 @@
+---
+import Base from '../../layouts/Base.astro';
+import JobCard from '../../components/JobCard.astro';
+import { loadJobs, locationsOf, SCOPE_LABEL, type EmploymentScope } from '../../data/jobs';
+
+const jobs = await loadJobs();
+const areas = locationsOf(jobs);
+const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] as EmploymentScope[];
+---
+<Base title="משרות פתוחות — ORT Tech"
+      description="כל המשרות הפתוחות שלנו. סינון לפי אזור וסוג משרה, וחיפוש חופשי.">
+  <div class="page wrap">
+    <header class="head stack" style="--gap: 8px">
+      <h1>משרות פתוחות</h1>
+      <p class="muted"><span id="count">{jobs.length}</span> משרות</p>
+    </header>
+
+    <form class="filters" role="search" aria-label="סינון משרות">
+      <div class="field grow">
+        <label class="visually-hidden" for="q">חיפוש</label>
+        <input type="search" id="q" name="q" placeholder="חיפוש לפי תפקיד, תחום או מילת מפתח" />
+      </div>
+      <div class="field">
+        <label class="visually-hidden" for="location">אזור</label>
+        <select id="location" name="location">
+          <option value="">כל האזורים</option>
+          {areas.map(a => <option value={a}>{a}</option>)}
+        </select>
+      </div>
+      <div class="field">
+        <label class="visually-hidden" for="scope">סוג משרה</label>
+        <select id="scope" name="scope">
+          <option value="">כל סוגי המשרה</option>
+          {scopes.map(s => <option value={s}>{SCOPE_LABEL[s]}</option>)}
+        </select>
+      </div>
+      <button type="button" id="reset" class="btn btn-quiet">ניקוי</button>
+    </form>
+
+    <div id="grid" class="grid">
+      {jobs.map(job => <JobCard job={job} />)}
+    </div>
+    <p id="empty" class="empty" hidden>לא נמצאו משרות שמתאימות לחיפוש. נסו לנקות את הסינון.</p>
+  </div>
+</Base>
+
+<script>
+  // חיפוש וסינון רצים בדפדפן על הכרטיסים שנבנו. אין קריאת רשת.
+  const q = document.getElementById('q') as HTMLInputElement;
+  const loc = document.getElementById('location') as HTMLSelectElement;
+  const scope = document.getElementById('scope') as HTMLSelectElement;
+  const reset = document.getElementById('reset') as HTMLButtonElement;
+  const cards = Array.from(document.querySelectorAll<HTMLElement>('.job-card'));
+  const count = document.getElementById('count')!;
+  const empty = document.getElementById('empty')!;
+
+  const params = new URLSearchParams(location.search);
+  if (params.get('q')) q.value = params.get('q')!;
+  if (params.get('location')) loc.value = params.get('location')!;
+  if (params.get('scope')) scope.value = params.get('scope')!;
+
+  function apply() {
+    const term = q.value.trim().toLowerCase();
+    const wantLoc = loc.value;
+    const wantScope = scope.value;
+    let shown = 0;
+    for (const card of cards) {
+      const title = (card.dataset.title ?? '').toLowerCase();
+      const okTerm = !term || title.includes(term);
+      const okLoc = !wantLoc || card.dataset.location === wantLoc;
+      const okScope = !wantScope || card.dataset.scope === wantScope;
+      const show = okTerm && okLoc && okScope;
+      card.hidden = !show;
+      if (show) shown++;
+    }
+    count.textContent = String(shown);
+    empty.hidden = shown !== 0;
+  }
+  [q, loc, scope].forEach(el => el.addEventListener('input', apply));
+  reset.addEventListener('click', () => { q.value = ''; loc.value = ''; scope.value = ''; apply(); });
+  apply();
+</script>
+
+<style>
+  .wrap { padding-block: 36px; }
+  .head { margin-block-end: 20px; }
+  .muted { color: var(--ink-soft); }
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
+    background: var(--surface-card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin-block-end: 24px;
+  }
+  .filters .grow { flex: 1 1 260px; }
+  .filters .field { flex: 0 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .empty { text-align: center; color: var(--ink-soft); padding-block: 48px; }
+  @media (max-width: 620px) { .filters .field, .filters .btn { inline-size: 100%; } }
+</style>

@@ -1,0 +1,20 @@
+[
+  { "slug": "backend-developer-nodejs-tel-aviv", "title": "מפתח/ת Backend — Node.js",
+    "body": "חברת תוכנה בתל אביב מחפשת מפתח/ת Backend לצוות הליבה.\n\nמה תעשו:\n• פיתוח שירותים ב-Node.js ו-TypeScript\n• עבודה מול PostgreSQL ותשתיות ענן\n• אחריות מקצה לקצה על פיצ׳רים\n\nדרישות:\n• שלוש שנות ניסיון ומעלה בפיתוח Backend\n• ניסיון עם TypeScript ובסיסי נתונים רלציוניים\n• עברית ואנגלית ברמה טובה",
+    "location": "תל אביב", "employment_scope": "full_time", "company_name": null, "published_at": "2026-09-07T09:00:00Z" },
+  { "slug": "qa-automation-engineer-herzliya", "title": "מהנדס/ת QA אוטומציה",
+    "body": "חברת מוצר בהרצליה מחפשת מהנדס/ת אוטומציה לצוות ה-QA.\n\nמה תעשו:\n• בנייה ותחזוקה של תשתית בדיקות אוטומטיות\n• עבודה צמודה עם צוותי הפיתוח\n• שיפור תהליכי CI\n\nדרישות:\n• שנתיים ניסיון באוטומציה\n• היכרות עם Playwright או Cypress\n• יכולת עבודה עצמאית",
+    "location": "הרצליה", "employment_scope": "full_time", "company_name": "אורטק", "published_at": "2026-09-05T07:30:00Z" },
+  { "slug": "bookkeeper-part-time-jerusalem", "title": "מנהל/ת חשבונות — משרה חלקית",
+    "body": "משרד רואי חשבון בירושלים מחפש מנהל/ת חשבונות למשרה חלקית.\n\nמה תעשו:\n• הנהלת חשבונות שוטפת\n• התאמות בנקים וספקים\n• הכנת חומר לדוחות\n\nדרישות:\n• תעודת הנהלת חשבונות סוג 2 ומעלה\n• ניסיון של שנתיים לפחות\n• שליטה בחשבשבת",
+    "location": "ירושלים", "employment_scope": "part_time", "company_name": null, "published_at": "2026-09-02T11:00:00Z" },
+  { "slug": "customer-success-manager-remote", "title": "מנהל/ת הצלחת לקוחות",
+    "body": "חברת SaaS מחפשת מנהל/ת הצלחת לקוחות לעבודה היברידית.\n\nמה תעשו:\n• ליווי לקוחות מההטמעה ועד החידוש\n• זיהוי הזדמנויות להרחבה\n• עבודה מול מוצר ותמיכה\n\nדרישות:\n• ניסיון קודם בתפקיד דומה\n• אנגלית ברמה גבוהה מאוד\n• יחסי אנוש מעולים",
+    "location": "עבודה היברידית", "employment_scope": "full_time", "company_name": null, "published_at": "2026-08-28T08:15:00Z" },
+  { "slug": "warehouse-logistics-shift-manager-ashdod", "title": "מנהל/ת משמרת לוגיסטיקה",
+    "body": "מרכז לוגיסטי באשדוד מחפש מנהל/ת משמרת.\n\nמה תעשו:\n• ניהול צוות של עשרה עובדים\n• אחריות על תפעול המשמרת ועמידה ביעדים\n• דיווח להנהלת המרכז\n\nדרישות:\n• ניסיון ניהולי קודם\n• זמינות לעבודה במשמרות\n• רישיון מלגזה יתרון",
+    "location": "אשדוד", "employment_scope": "full_time", "company_name": null, "published_at": "2026-08-24T06:00:00Z" },
+  { "slug": "student-support-position-beer-sheva", "title": "נציג/ת תמיכה — משרת סטודנט",
+    "body": "מוקד תמיכה בבאר שבע מחפש נציגים למשרת סטודנט.\n\nמה תעשו:\n• מענה טלפוני ובכתב ללקוחות\n• תיעוד פניות במערכת\n\nדרישות:\n• זמינות לשלוש משמרות בשבוע\n• עברית רהוטה\n• ללא צורך בניסיון קודם",
+    "location": "באר שבע", "employment_scope": "student", "company_name": null, "published_at": "2026-08-20T10:00:00Z" }
+]

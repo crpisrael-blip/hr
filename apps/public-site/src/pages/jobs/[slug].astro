@@ -1,0 +1,96 @@
+---
+import Base from '../../layouts/Base.astro';
+import ApplyForm from '../../components/ApplyForm.astro';
+import { loadJobs, SCOPE_LABEL, formatDate, type Job } from '../../data/jobs';
+
+export async function getStaticPaths() {
+  const jobs = await loadJobs();
+  return jobs.map(job => ({ params: { slug: job.slug }, props: { job } }));
+}
+
+interface Props { job: Job; }
+const { job } = Astro.props;
+const paragraphs = job.body.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: job.title,
+  description: job.body,
+  datePosted: job.published_at,
+  employmentType: job.employment_scope,
+  hiringOrganization: job.company_name
+    ? { '@type': 'Organization', name: job.company_name }
+    : { '@type': 'Organization', name: 'ORT Tech (חסוי)' },
+  jobLocation: job.location
+    ? { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: job.location, addressCountry: 'IL' } }
+    : undefined,
+};
+---
+<Base title={`${job.title}${job.location ? ' · ' + job.location : ''} — ORT Tech`}
+      description={job.body.replace(/[•\n]+/g, ' ').slice(0, 155)}
+      jsonLd={jsonLd}>
+  <div class="page wrap">
+    <nav class="crumbs" aria-label="פירורי לחם">
+      <a href="/jobs">משרות</a> <span aria-hidden="true">/</span> <span>{job.title}</span>
+    </nav>
+
+    <div class="layout">
+      <article class="detail">
+        <header class="stack" style="--gap: 12px">
+          <h1>{job.title}</h1>
+          <div class="meta">
+            {job.location && <span class="chip">📍 {job.location}</span>}
+            {job.employment_scope && <span class="chip">{SCOPE_LABEL[job.employment_scope]}</span>}
+            {job.company_name && <span class="chip chip-company">{job.company_name}</span>}
+            <span class="date">פורסם {formatDate(job.published_at)}</span>
+          </div>
+        </header>
+        <div class="body stack" style="--gap: 14px">
+          {paragraphs.map(block => {
+            const lines = block.split('\n');
+            const isList = lines.slice(1).some(l => l.trim().startsWith('•'));
+            if (isList) {
+              const head = lines[0].replace(/[:•]\s*$/, '');
+              const items = lines.filter(l => l.trim().startsWith('•')).map(l => l.replace(/^\s*•\s*/, ''));
+              return (<div><p class="block-head">{head}</p><ul>{items.map(i => <li>{i}</li>)}</ul></div>);
+            }
+            return <p>{block}</p>;
+          })}
+        </div>
+      </article>
+
+      <aside class="side">
+        <div class="apply-card" id="apply">
+          <h2>הגשת מועמדות</h2>
+          <p class="muted">ההגשה לוקחת דקה. אפשר לצרף קובץ קורות חיים.</p>
+          <ApplyForm slug={job.slug} jobTitle={job.title} />
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .wrap { padding-block: 28px 8px; }
+  .crumbs { font-size: .88rem; color: var(--ink-soft); margin-block-end: 20px; }
+  .crumbs a { text-decoration: none; }
+  .layout { display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items: start; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .chip { display: inline-flex; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: .82rem;
+    background: var(--surface-sunk); color: var(--ink-mid); border: 1px solid var(--line); }
+  .chip-company { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
+  .date { color: var(--ink-soft); font-size: .82rem; }
+  .body { margin-block-start: 24px; color: var(--ink-mid); font-size: 1.02rem; }
+  .body .block-head { font-weight: 700; color: var(--ink); margin-block-end: 6px; }
+  .body ul { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; }
+  .side { position: sticky; inset-block-start: 84px; }
+  .apply-card { background: var(--surface-card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-md); }
+  .apply-card h2 { margin-block-end: 6px; }
+  .muted { color: var(--ink-soft); font-size: .9rem; margin-block-end: 16px; }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    .side { position: static; }
+  }
+</style>

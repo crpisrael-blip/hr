@@ -1,0 +1,20 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../data/site';
+---
+<Base title="מדיניות פרטיות — ORT Tech" description="כיצד אנחנו אוספים, שומרים ומשתמשים במידע של מועמדים.">
+  <div class="page wrap measure stack" style="--gap: 18px">
+    <h1>מדיניות פרטיות</h1>
+    <p class="muted">טיוטה לדוגמה. הנוסח המחייב ייקבע על ידי {SITE.shortName} וייעוץ משפטי לפני העלייה לאוויר.</p>
+    <div><h2>איזה מידע אנחנו אוספים</h2><p>שם, טלפון, דוא״ל וקורות חיים שאתם מוסרים בעת הגשת מועמדות, ומידע על התקדמות המועמדות.</p></div>
+    <div><h2>למה אנחנו משתמשים בו</h2><p>לצורך תהליך הגיוס וההשמה בלבד: יצירת קשר, התאמה למשרות והגשה למעסיקים. איננו מוכרים מידע לצד שלישי.</p></div>
+    <div><h2>שמירה ומחיקה</h2><p>המידע נשמר כל עוד הוא רלוונטי לתהליך. אתם רשאים לבקש עיון, תיקון או מחיקה בכל עת דרך האזור האישי או פנייה אלינו.</p></div>
+    <div><h2>יצירת קשר</h2><p>בכל שאלה בנושא פרטיות: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p></div>
+  </div>
+</Base>
+<style>
+  .wrap { padding-block: 40px; }
+  .muted { color: var(--ink-soft); font-size: .9rem; }
+  h2 { margin-block-end: 6px; }
+  .wrap p { color: var(--ink-mid); }
+</style>

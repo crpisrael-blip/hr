@@ -1,0 +1,46 @@
+---
+import { SITE, NAV } from '../data/site';
+const year = new Date().getFullYear();
+---
+<footer class="site-footer">
+  <div class="page cols">
+    <div>
+      <div class="f-brand">{SITE.name}</div>
+      <p class="measure muted">{SITE.tagline}. חברת גיוס והשמה המחברת בין מועמדים למעסיקים.</p>
+    </div>
+    <nav aria-label="ניווט תחתון">
+      <ul>{NAV.map(i => <li><a href={i.href}>{i.label}</a></li>)}</ul>
+    </nav>
+    <div class="contact">
+      <a href={SITE.phoneHref}>{SITE.phone}</a>
+      <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+      <a href={SITE.whatsapp}>וואטסאפ</a>
+    </div>
+  </div>
+  <div class="page legal">
+    <span>© {year} {SITE.shortName}</span>
+    <span class="dots">·</span>
+    <a href="/privacy">מדיניות פרטיות</a>
+  </div>
+</footer>
+
+<style>
+  .site-footer { margin-block-start: 72px; border-block-start: 1px solid var(--line); background: var(--surface-card); }
+  .cols {
+    display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 32px;
+    padding-block: 40px 24px;
+  }
+  .f-brand { font-weight: 700; margin-block-end: 8px; }
+  .muted { color: var(--ink-soft); font-size: .92rem; }
+  .site-footer ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .site-footer a { color: var(--ink-mid); text-decoration: none; font-size: .95rem; }
+  .site-footer a:hover { color: var(--brand); }
+  .contact { display: grid; gap: 8px; align-content: start; }
+  .legal {
+    display: flex; align-items: center; gap: 10px;
+    padding-block: 16px 24px; color: var(--ink-soft); font-size: .85rem;
+    border-block-start: 1px solid var(--line);
+  }
+  .legal a { color: var(--ink-soft); }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; gap: 24px; } }
+</style>

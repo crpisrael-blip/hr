@@ -1,0 +1,85 @@
+---
+import { SITE, NAV } from '../data/site';
+const path = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? path === '/' : path.startsWith(href);
+---
+<header class="site-header">
+  <div class="page bar">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">ort</span>
+      <span class="brand-name">{SITE.shortName}<span class="brand-sub">גיוס והשמה</span></span>
+    </a>
+
+    <nav aria-label="ראשי">
+      <input type="checkbox" id="nav-toggle" class="visually-hidden" />
+      <label for="nav-toggle" class="nav-burger" aria-label="תפריט">
+        <span></span><span></span><span></span>
+      </label>
+      <ul class="nav-list">
+        {NAV.map(item => (
+          <li>
+            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+              {item.label}
+            </a>
+          </li>
+        ))}
+        <li class="nav-cta">
+          <a class="btn btn-quiet" href={SITE.candidateArea}>האזור האישי</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky; inset-block-start: 0; z-index: 20;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-block-end: 1px solid var(--line);
+  }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; }
+
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+  .brand-mark {
+    display: inline-grid; place-items: center;
+    inline-size: 38px; block-size: 38px; border-radius: 9px;
+    background: var(--brand); color: #fff;
+    font-weight: 700; font-size: .95rem; letter-spacing: .02em;
+  }
+  .brand-name { display: flex; flex-direction: column; font-weight: 700; line-height: 1.15; }
+  .brand-sub { font-size: .72rem; font-weight: 500; color: var(--ink-soft); letter-spacing: .01em; }
+
+  .nav-list { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .nav-list a:not(.btn) {
+    display: inline-block; padding: 8px 12px; border-radius: var(--radius-sm);
+    text-decoration: none; color: var(--ink-mid); font-weight: 600; font-size: .95rem;
+  }
+  .nav-list a:not(.btn):hover { background: var(--surface-sunk); color: var(--ink); }
+  .nav-list a[aria-current="page"] { color: var(--brand); background: var(--brand-soft); }
+  .nav-cta { margin-inline-start: 6px; }
+
+  .nav-burger { display: none; }
+  #nav-toggle { display: none; }
+
+  @media (max-width: 720px) {
+    .nav-burger {
+      display: inline-grid; gap: 5px; padding: 10px; cursor: pointer;
+      background: none; border: 0;
+    }
+    .nav-burger span { display: block; inline-size: 22px; block-size: 2px; background: var(--ink); border-radius: 2px; }
+    .nav-list {
+      position: absolute; inset-inline: 0; inset-block-start: 64px;
+      flex-direction: column; align-items: stretch; gap: 2px;
+      background: var(--surface-card); border-block-end: 1px solid var(--line);
+      padding: 12px 20px 18px; box-shadow: var(--shadow-md);
+      max-block-size: 0; overflow: hidden; padding-block: 0; border: 0;
+      transition: max-block-size .2s ease, padding-block .2s ease;
+    }
+    #nav-toggle:checked ~ .nav-list { max-block-size: 340px; padding-block: 12px 18px; border-block-end: 1px solid var(--line); }
+    .nav-list a:not(.btn) { padding: 12px; }
+    .nav-cta { margin-block-start: 6px; }
+    .nav-cta .btn { inline-size: 100%; }
+  }
+</style>

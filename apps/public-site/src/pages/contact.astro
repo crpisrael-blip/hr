@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../data/site';
+---
+<Base title="צור קשר — ORT Tech" description="דרכי יצירת קשר עם ORT Tech: טלפון, וואטסאפ ודוא״ל.">
+  <div class="page wrap">
+    <h1>דברו איתנו</h1>
+    <p class="lead measure">מחפשים עבודה או מחפשים לגייס? נשמח לשמוע. הנה כל הדרכים להגיע אלינו.</p>
+    <div class="cards">
+      <a class="c" href={SITE.phoneHref}><span class="ic">📞</span><h3>טלפון</h3><p>{SITE.phone}</p></a>
+      <a class="c" href={SITE.whatsapp}><span class="ic">💬</span><h3>וואטסאפ</h3><p>שליחת הודעה</p></a>
+      <a class="c" href={`mailto:${SITE.email}`}><span class="ic">✉️</span><h3>דוא״ל</h3><p>{SITE.email}</p></a>
+    </div>
+    <div class="note">
+      <p>מועמדים: הדרך המהירה היא להגיש דרך <a href="/jobs">עמוד המשרות</a>. כבר הגשתם? היכנסו ל<a href={SITE.candidateArea}>אזור האישי</a>.</p>
+    </div>
+  </div>
+</Base>
+<style>
+  .wrap { padding-block: 40px; }
+  .lead { color: var(--ink-mid); font-size: 1.08rem; margin-block: 10px 28px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .c { display: block; text-align: center; text-decoration: none; color: inherit;
+    background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 28px 20px; transition: border-color .14s, transform .14s; }
+  .c:hover { border-color: var(--brand); transform: translateY(-2px); }
+  .ic { font-size: 1.8rem; }
+  .c h3 { margin-block: 10px 4px; }
+  .c p { color: var(--ink-mid); }
+  .note { margin-block-start: 28px; padding: 18px 20px; background: var(--surface-sunk);
+    border-radius: var(--radius); color: var(--ink-mid); }
+</style>

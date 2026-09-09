@@ -1,0 +1,126 @@
+---
+import Base from '../layouts/Base.astro';
+import JobCard from '../components/JobCard.astro';
+import { loadJobs, locationsOf } from '../data/jobs';
+import { SITE } from '../data/site';
+
+const jobs = await loadJobs();
+const latest = jobs.slice(0, 6);
+const areas = locationsOf(jobs).slice(0, 8);
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: SITE.name,
+  url: Astro.site?.href,
+  contactPoint: { '@type': 'ContactPoint', telephone: SITE.phone, contactType: 'recruitment' },
+};
+---
+<Base title={`${SITE.name} — ${SITE.tagline}`}
+      description="חברת גיוס והשמה. משרות פתוחות במגוון תחומים, והגשת מועמדות פשוטה ומהירה."
+      jsonLd={jsonLd}>
+
+  <section class="hero">
+    <div class="page hero-grid">
+      <div class="hero-copy stack" style="--gap: 20px">
+        <span class="eyebrow">גיוס והשמה</span>
+        <h1>{SITE.tagline}.<br />ואת המשרה שמתאימה לך.</h1>
+        <p class="lead measure">
+          אנחנו מחברים בין מועמדים למעסיקים לפי מה שחשוב באמת: התאמה אמיתית,
+          ולא רק שורות בקורות חיים. עברו על המשרות הפתוחות והגישו בכמה דקות.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/jobs">לכל המשרות</a>
+          <a class="btn btn-quiet" href={SITE.candidateArea}>כבר הגשתם? לאזור האישי</a>
+        </div>
+        <div class="stat-row">
+          <div><strong>{jobs.length}</strong><span>משרות פתוחות</span></div>
+          <div><strong>{areas.length}+</strong><span>אזורים בארץ</span></div>
+          <div><strong>24ש׳</strong><span>זמן תגובה ממוצע</span></div>
+        </div>
+      </div>
+
+      <aside class="hero-side" aria-label="חיפוש מהיר">
+        <form class="quick-search" action="/jobs" method="get" role="search">
+          <div class="field">
+            <label class="label" for="q">מה מחפשים?</label>
+            <input type="search" id="q" name="q" placeholder="תפקיד, תחום או מילת מפתח" />
+          </div>
+          <div class="field">
+            <label class="label" for="loc">איפה?</label>
+            <select id="loc" name="location">
+              <option value="">כל האזורים</option>
+              {areas.map(a => <option value={a}>{a}</option>)}
+            </select>
+          </div>
+          <button class="btn btn-accent" type="submit">חיפוש משרות</button>
+        </form>
+      </aside>
+    </div>
+  </section>
+
+  <section class="page latest">
+    <div class="section-head">
+      <h2>משרות אחרונות</h2>
+      <a href="/jobs" class="more">לכל המשרות ←</a>
+    </div>
+    <div class="grid">
+      {latest.map(job => <JobCard job={job} />)}
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="cta-band">
+      <div>
+        <h2>לא מצאתם משרה מתאימה?</h2>
+        <p class="measure">השאירו פרטים ונעדכן אתכם ברגע שתיפתח משרה שמתאימה לכם.</p>
+      </div>
+      <a class="btn btn-primary" href={`${SITE.candidateArea}/register`}>עדכנו אותי במשרות</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hero { background:
+      radial-gradient(120% 80% at 100% 0%, var(--brand-soft) 0%, transparent 55%),
+      var(--surface); border-block-end: 1px solid var(--line); }
+  .hero-grid {
+    display: grid; grid-template-columns: 1.5fr 1fr; gap: 40px;
+    align-items: center; padding-block: 56px 60px;
+  }
+  .eyebrow { color: var(--brand); font-weight: 700; font-size: .9rem; letter-spacing: .04em; }
+  .hero-copy h1 { font-size: clamp(1.9rem, 1.3rem + 2.6vw, 3rem); }
+  .lead { color: var(--ink-mid); font-size: 1.08rem; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .stat-row { display: flex; gap: 28px; padding-block-start: 12px; }
+  .stat-row div { display: flex; flex-direction: column; }
+  .stat-row strong { font-size: 1.5rem; color: var(--brand); }
+  .stat-row span { font-size: .85rem; color: var(--ink-soft); }
+
+  .hero-side { }
+  .quick-search {
+    display: grid; gap: 14px;
+    background: var(--surface-card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-md);
+  }
+  .quick-search .btn { inline-size: 100%; margin-block-start: 4px; }
+
+  .latest { padding-block-start: 52px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-block-end: 20px; }
+  .more { font-weight: 600; text-decoration: none; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+  .cta-band {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+    margin-block-start: 56px; padding: 32px;
+    background: var(--brand); color: #fff; border-radius: var(--radius);
+  }
+  .cta-band h2 { color: #fff; }
+  .cta-band p { color: color-mix(in srgb, #fff 82%, transparent); }
+  .cta-band .btn-primary { background: #fff; color: var(--brand-ink); }
+  .cta-band .btn-primary:hover { background: #f0efe9; color: var(--brand-ink); }
+
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 28px; padding-block: 36px 40px; }
+  }
+</style>
