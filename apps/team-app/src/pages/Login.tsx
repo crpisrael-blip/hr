@@ -19,7 +19,6 @@ export default function Login() {
     <div className="login-wrap">
       <form className="card login" onSubmit={onSubmit}>
         <picture>
-          <source srcSet="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
           <img src="/ursa-logo.png" alt="URSA GROUP" style={{ height: 38, width: 'auto', marginInline: 'auto' }} />
         </picture>
         <h1>ניהול הגיוס</h1>

@@ -22,15 +22,14 @@ export default function Tasks() {
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין משימות פתוחות.</div>}
       {rows && rows.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <table>
-            <thead><tr><th>משימה</th><th>עדיפות</th><th>מצב</th><th>יעד</th></tr></thead>
-            <tbody>{rows.map(r => (
-              <tr key={r.id}><td style={{ fontWeight: 600 }}>{r.title}</td>
-                <td><span className={'tag ' + (r.priority==='urgent'||r.priority==='high'?'warn':'mute')}>{PRIORITY[r.priority]}</span></td>
-                <td>{STATUS[r.status]}</td><td className="num">{formatDate(r.due_at)}</td></tr>
-            ))}</tbody>
-          </table>
+        <div className="record-grid">
+          {rows.map(r => (
+            <article className="card record-card" key={r.id}>
+              <header><span className="tag brand">{STATUS[r.status]}</span><span className={'tag ' + (r.priority==='urgent'||r.priority==='high'?'warn':'mute')}>עדיפות {PRIORITY[r.priority]}</span></header>
+              <h2>{r.title}</h2>
+              <footer><span className="hint">תאריך יעד</span><span className="num">{formatDate(r.due_at)}</span></footer>
+            </article>
+          ))}
         </div>
       )}
     </>
