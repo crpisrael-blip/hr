@@ -1,34 +1,31 @@
 ---
-import { SITE, NAV } from '../data/site';
 const path = Astro.url.pathname;
+const links = [
+  { href: '/',        label: 'בית' },
+  { href: '/jobs',    label: 'משרות' },
+  { href: '/about',   label: 'אודות' },
+  { href: '/contact', label: 'יצירת קשר' },
+];
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path.startsWith(href);
 ---
 <header class="site-header">
   <div class="page bar">
-    <a class="brand" href="/">
-      <span class="brand-mark" aria-hidden="true">ort</span>
-      <span class="brand-name">{SITE.shortName}<span class="brand-sub">גיוס והשמה</span></span>
+    <a href="/" class="brand" aria-label="דף הבית">
+      <span class="brand-mark" aria-hidden="true">ort<span>·</span>hr</span>
     </a>
-
-    <nav aria-label="ראשי">
-      <input type="checkbox" id="nav-toggle" class="visually-hidden" />
-      <label for="nav-toggle" class="nav-burger" aria-label="תפריט">
-        <span></span><span></span><span></span>
-      </label>
-      <ul class="nav-list">
-        {NAV.map(item => (
+    <nav aria-label="ניווט ראשי">
+      <ul>
+        {links.map(l => (
           <li>
-            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-              {item.label}
+            <a href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}>
+              {l.label}
             </a>
           </li>
         ))}
-        <li class="nav-cta">
-          <a class="btn btn-quiet" href={SITE.candidateArea}>האזור האישי</a>
-        </li>
       </ul>
     </nav>
+    <a href="/jobs" class="btn btn-primary bar-cta">למשרות הפתוחות</a>
   </div>
 </header>
 
@@ -36,50 +33,30 @@ const isActive = (href: string) =>
   .site-header {
     position: sticky; inset-block-start: 0; z-index: 20;
     background: color-mix(in srgb, var(--surface) 88%, transparent);
-    backdrop-filter: blur(8px);
+    backdrop-filter: saturate(140%) blur(8px);
     border-block-end: 1px solid var(--line);
   }
-  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; }
-
-  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+  .bar {
+    display: flex; align-items: center; gap: 20px;
+    min-block-size: 64px;
+  }
+  .brand { text-decoration: none; margin-inline-end: auto; }
   .brand-mark {
-    display: inline-grid; place-items: center;
-    inline-size: 38px; block-size: 38px; border-radius: 9px;
-    background: var(--brand); color: #fff;
-    font-weight: 700; font-size: .95rem; letter-spacing: .02em;
+    font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--ink);
   }
-  .brand-name { display: flex; flex-direction: column; font-weight: 700; line-height: 1.15; }
-  .brand-sub { font-size: .72rem; font-weight: 500; color: var(--ink-soft); letter-spacing: .01em; }
-
-  .nav-list { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
-  .nav-list a:not(.btn) {
+  .brand-mark span { color: var(--brand); }
+  nav ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  nav a {
     display: inline-block; padding: 8px 12px; border-radius: var(--radius-sm);
-    text-decoration: none; color: var(--ink-mid); font-weight: 600; font-size: .95rem;
+    color: var(--ink-mid); text-decoration: none; font-weight: 500;
   }
-  .nav-list a:not(.btn):hover { background: var(--surface-sunk); color: var(--ink); }
-  .nav-list a[aria-current="page"] { color: var(--brand); background: var(--brand-soft); }
-  .nav-cta { margin-inline-start: 6px; }
-
-  .nav-burger { display: none; }
-  #nav-toggle { display: none; }
-
-  @media (max-width: 720px) {
-    .nav-burger {
-      display: inline-grid; gap: 5px; padding: 10px; cursor: pointer;
-      background: none; border: 0;
-    }
-    .nav-burger span { display: block; inline-size: 22px; block-size: 2px; background: var(--ink); border-radius: 2px; }
-    .nav-list {
-      position: absolute; inset-inline: 0; inset-block-start: 64px;
-      flex-direction: column; align-items: stretch; gap: 2px;
-      background: var(--surface-card); border-block-end: 1px solid var(--line);
-      padding: 12px 20px 18px; box-shadow: var(--shadow-md);
-      max-block-size: 0; overflow: hidden; padding-block: 0; border: 0;
-      transition: max-block-size .2s ease, padding-block .2s ease;
-    }
-    #nav-toggle:checked ~ .nav-list { max-block-size: 340px; padding-block: 12px 18px; border-block-end: 1px solid var(--line); }
-    .nav-list a:not(.btn) { padding: 12px; }
-    .nav-cta { margin-block-start: 6px; }
-    .nav-cta .btn { inline-size: 100%; }
+  nav a:hover { background: var(--surface-sunk); color: var(--ink); }
+  nav a[aria-current="page"] { color: var(--brand); font-weight: 600; }
+  .bar-cta { min-height: 40px; padding-block: 8px; }
+  @media (max-width: 640px) {
+    .bar { flex-wrap: wrap; min-block-size: 56px; gap: 8px 16px; }
+    .bar-cta { display: none; }
+    nav ul { gap: 2px; }
+    nav a { padding: 8px; }
   }
 </style>

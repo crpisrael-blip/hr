@@ -1,0 +1,7 @@
+name = "hr-public-site"
+compatibility_date = "2025-09-01"
+
+# אתר סטטי בלבד. אין Worker script, רק הגשת קבצים מ-dist.
+[assets]
+directory = "./dist"
+not_found_handling = "404-page"

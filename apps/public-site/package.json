@@ -12,6 +12,7 @@
     "astro": "^5.14.1"
   },
   "devDependencies": {
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "wrangler": "^4.42.0"
   }
 }

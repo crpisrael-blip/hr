@@ -1,20 +1,19 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="הדף לא נמצא — ORT Tech" description="הדף לא נמצא" noindex={true}>
+<Base title="הדף לא נמצא — ort·hr" description="הדף שחיפשתם לא קיים." noindex={true}>
   <div class="page center">
-    <p class="big">404</p>
+    <p class="code">404</p>
     <h1>הדף לא נמצא</h1>
-    <p class="muted">ייתכן שהמשרה נסגרה או שהקישור השתנה.</p>
-    <div class="acts">
-      <a class="btn btn-primary" href="/jobs">למשרות הפתוחות</a>
-      <a class="btn btn-quiet" href="/">לדף הבית</a>
+    <p class="measure">ייתכן שהמשרה נסגרה או שהקישור השתנה.</p>
+    <div class="cta">
+      <a href="/jobs" class="btn btn-primary">למשרות הפתוחות</a>
+      <a href="/" class="btn btn-quiet">לדף הבית</a>
     </div>
   </div>
 </Base>
 <style>
-  .center { text-align: center; padding-block: 80px 100px; }
-  .big { font-size: 4rem; font-weight: 700; color: var(--brand); line-height: 1; }
-  .muted { color: var(--ink-soft); margin-block: 8px 20px; }
-  .acts { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .center { padding-block: 72px; text-align: center; display: grid; gap: 12px; justify-items: center; }
+  .code { font-size: 3rem; font-weight: 700; color: var(--brand); line-height: 1; }
+  .cta { display: flex; gap: 12px; margin-block-start: 12px; }
 </style>

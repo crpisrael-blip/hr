@@ -1,16 +1,25 @@
 ---
 import Base from '../../layouts/Base.astro';
-import ApplyForm from '../../components/ApplyForm.astro';
-import { loadJobs, SCOPE_LABEL, formatDate, type Job } from '../../data/jobs';
+import { loadJobs, type Job, SCOPE_LABEL, formatDate } from '../../data/jobs';
 
 export async function getStaticPaths() {
   const jobs = await loadJobs();
   return jobs.map(job => ({ params: { slug: job.slug }, props: { job } }));
 }
-
 interface Props { job: Job; }
 const { job } = Astro.props;
-const paragraphs = job.body.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+const scope = job.employment_scope ? SCOPE_LABEL[job.employment_scope] : null;
+
+// גוף המשרה נשמר כטקסט עם שורות ותבליטים. הופכים לפסקאות ורשימות.
+const blocks = job.body.split(/\n{2,}/).map(chunk => {
+  const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
+  const bullets = lines.filter(l => l.startsWith('•'));
+  if (bullets.length && bullets.length === lines.filter(l => !l.endsWith(':')).length) {
+    const heading = lines.find(l => l.endsWith(':'));
+    return { heading, items: bullets.map(b => b.replace(/^•\s*/, '')) };
+  }
+  return { text: lines.join(' ') };
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -18,79 +27,64 @@ const jsonLd = {
   title: job.title,
   description: job.body,
   datePosted: job.published_at,
-  employmentType: job.employment_scope,
+  employmentType: job.employment_scope ?? undefined,
   hiringOrganization: job.company_name
     ? { '@type': 'Organization', name: job.company_name }
-    : { '@type': 'Organization', name: 'ORT Tech (חסוי)' },
+    : { '@type': 'Organization', name: 'ort·hr' },
   jobLocation: job.location
     ? { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: job.location, addressCountry: 'IL' } }
     : undefined,
 };
 ---
-<Base title={`${job.title}${job.location ? ' · ' + job.location : ''} — ORT Tech`}
-      description={job.body.replace(/[•\n]+/g, ' ').slice(0, 155)}
-      jsonLd={jsonLd}>
+<Base title={`${job.title} — ort·hr`} description={job.body.slice(0, 155)} jsonLd={jsonLd}>
   <div class="page wrap">
-    <nav class="crumbs" aria-label="פירורי לחם">
-      <a href="/jobs">משרות</a> <span aria-hidden="true">/</span> <span>{job.title}</span>
+    <nav class="crumbs" aria-label="מיקום">
+      <a href="/jobs">משרות</a> <span aria-hidden="true">›</span> <span>{job.title}</span>
     </nav>
 
-    <div class="layout">
-      <article class="detail">
-        <header class="stack" style="--gap: 12px">
-          <h1>{job.title}</h1>
-          <div class="meta">
-            {job.location && <span class="chip">📍 {job.location}</span>}
-            {job.employment_scope && <span class="chip">{SCOPE_LABEL[job.employment_scope]}</span>}
-            {job.company_name && <span class="chip chip-company">{job.company_name}</span>}
-            <span class="date">פורסם {formatDate(job.published_at)}</span>
-          </div>
-        </header>
-        <div class="body stack" style="--gap: 14px">
-          {paragraphs.map(block => {
-            const lines = block.split('\n');
-            const isList = lines.slice(1).some(l => l.trim().startsWith('•'));
-            if (isList) {
-              const head = lines[0].replace(/[:•]\s*$/, '');
-              const items = lines.filter(l => l.trim().startsWith('•')).map(l => l.replace(/^\s*•\s*/, ''));
-              return (<div><p class="block-head">{head}</p><ul>{items.map(i => <li>{i}</li>)}</ul></div>);
-            }
-            return <p>{block}</p>;
-          })}
-        </div>
-      </article>
+    <article class="detail">
+      <header>
+        <h1>{job.title}</h1>
+        <ul class="meta" aria-label="פרטי משרה">
+          {job.location && <li>📍 {job.location}</li>}
+          {scope && <li>🕒 {scope}</li>}
+          {job.company_name && <li>🏢 {job.company_name}</li>}
+          <li>📅 פורסם {formatDate(job.published_at)}</li>
+        </ul>
+      </header>
 
-      <aside class="side">
-        <div class="apply-card" id="apply">
-          <h2>הגשת מועמדות</h2>
-          <p class="muted">ההגשה לוקחת דקה. אפשר לצרף קובץ קורות חיים.</p>
-          <ApplyForm slug={job.slug} jobTitle={job.title} />
-        </div>
-      </aside>
-    </div>
+      <div class="body">
+        {blocks.map(b => b.items
+          ? (<>{b.heading && <h2>{b.heading.replace(/:$/, '')}</h2>}<ul>{b.items.map(i => <li>{i}</li>)}</ul></>)
+          : <p>{b.text}</p>)}
+      </div>
+    </article>
+
+    <aside class="apply-box">
+      <h2>מעוניינים במשרה?</h2>
+      <p>הגישו מועמדות בכמה דקות. מגייס אישי יחזור אליכם.</p>
+      <a href={`/apply/${job.slug}`} class="btn btn-accent">הגשת מועמדות</a>
+      <a href="/jobs" class="btn btn-quiet">חזרה לכל המשרות</a>
+    </aside>
   </div>
 </Base>
 
 <style>
-  .wrap { padding-block: 28px 8px; }
-  .crumbs { font-size: .88rem; color: var(--ink-soft); margin-block-end: 20px; }
-  .crumbs a { text-decoration: none; }
-  .layout { display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items: start; }
-  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .chip { display: inline-flex; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: .82rem;
-    background: var(--surface-sunk); color: var(--ink-mid); border: 1px solid var(--line); }
-  .chip-company { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
-  .date { color: var(--ink-soft); font-size: .82rem; }
-  .body { margin-block-start: 24px; color: var(--ink-mid); font-size: 1.02rem; }
-  .body .block-head { font-weight: 700; color: var(--ink); margin-block-end: 6px; }
-  .body ul { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; }
-  .side { position: sticky; inset-block-start: 84px; }
-  .apply-card { background: var(--surface-card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-md); }
-  .apply-card h2 { margin-block-end: 6px; }
-  .muted { color: var(--ink-soft); font-size: .9rem; margin-block-end: 16px; }
-  @media (max-width: 880px) {
-    .layout { grid-template-columns: 1fr; }
-    .side { position: static; }
+  .wrap { padding-block: 24px 40px; display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 40px; align-items: start; }
+  .crumbs { grid-column: 1 / -1; color: var(--ink-soft); font-size: .9rem; }
+  .crumbs a { color: var(--ink-mid); }
+  .detail h1 { margin-block: 12px 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0; padding: 0; color: var(--ink-mid); font-size: .92rem; }
+  .body { margin-block-start: 24px; }
+  .body :global(h2) { font-size: 1.15rem; margin-block: 24px 10px; }
+  .body :global(p) { color: var(--ink-mid); margin-block-end: 12px; max-width: var(--measure); }
+  .body :global(ul) { padding-inline-start: 20px; color: var(--ink-mid); display: grid; gap: 6px; }
+  .apply-box { position: sticky; inset-block-start: 84px; background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; display: grid; gap: 12px; box-shadow: var(--shadow-sm); }
+  .apply-box h2 { font-size: 1.1rem; }
+  .apply-box p { color: var(--ink-mid); font-size: .92rem; }
+  .apply-box .btn { inline-size: 100%; }
+  @media (max-width: 820px) {
+    .wrap { grid-template-columns: 1fr; gap: 24px; }
+    .apply-box { position: static; }
   }
 </style>

@@ -1,98 +1,84 @@
 ---
 import Base from '../../layouts/Base.astro';
 import JobCard from '../../components/JobCard.astro';
-import { loadJobs, locationsOf, SCOPE_LABEL, type EmploymentScope } from '../../data/jobs';
-
+import { loadJobs, locationsOf, SCOPE_LABEL } from '../../data/jobs';
 const jobs = await loadJobs();
-const areas = locationsOf(jobs);
-const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] as EmploymentScope[];
+const locations = locationsOf(jobs);
+const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] as string[];
 ---
-<Base title="משרות פתוחות — ORT Tech"
-      description="כל המשרות הפתוחות שלנו. סינון לפי אזור וסוג משרה, וחיפוש חופשי.">
+<Base
+  title="משרות פתוחות — ort·hr"
+  description="כל המשרות הפתוחות שלנו במקום אחד. חיפוש וסינון לפי מיקום והיקף משרה.">
   <div class="page wrap">
-    <header class="head stack" style="--gap: 8px">
+    <header class="head">
       <h1>משרות פתוחות</h1>
-      <p class="muted"><span id="count">{jobs.length}</span> משרות</p>
+      <p class="count"><span id="count">{jobs.length}</span> משרות</p>
     </header>
 
-    <form class="filters" role="search" aria-label="סינון משרות">
+    <div class="filters" role="search">
       <div class="field grow">
-        <label class="visually-hidden" for="q">חיפוש</label>
-        <input type="search" id="q" name="q" placeholder="חיפוש לפי תפקיד, תחום או מילת מפתח" />
+        <label class="visually-hidden" for="q">חיפוש חופשי</label>
+        <input type="search" id="q" placeholder="חיפוש לפי תפקיד או מילת מפתח…" autocomplete="off" />
       </div>
       <div class="field">
-        <label class="visually-hidden" for="location">אזור</label>
-        <select id="location" name="location">
-          <option value="">כל האזורים</option>
-          {areas.map(a => <option value={a}>{a}</option>)}
+        <label class="visually-hidden" for="loc">מיקום</label>
+        <select id="loc">
+          <option value="">כל המיקומים</option>
+          {locations.map(l => <option value={l}>{l}</option>)}
         </select>
       </div>
       <div class="field">
-        <label class="visually-hidden" for="scope">סוג משרה</label>
-        <select id="scope" name="scope">
-          <option value="">כל סוגי המשרה</option>
-          {scopes.map(s => <option value={s}>{SCOPE_LABEL[s]}</option>)}
+        <label class="visually-hidden" for="scope">היקף</label>
+        <select id="scope">
+          <option value="">כל ההיקפים</option>
+          {scopes.map(s => <option value={s}>{SCOPE_LABEL[s as keyof typeof SCOPE_LABEL]}</option>)}
         </select>
       </div>
-      <button type="button" id="reset" class="btn btn-quiet">ניקוי</button>
-    </form>
-
-    <div id="grid" class="grid">
-      {jobs.map(job => <JobCard job={job} />)}
     </div>
-    <p id="empty" class="empty" hidden>לא נמצאו משרות שמתאימות לחיפוש. נסו לנקות את הסינון.</p>
+
+    {jobs.length === 0 ? (
+      <p class="empty">אין כרגע משרות פתוחות. חזרו בקרוב.</p>
+    ) : (
+      <div class="grid" id="grid">
+        {jobs.map(job => <JobCard job={job} />)}
+      </div>
+    )}
+    <p class="empty" id="noresults" hidden>לא נמצאו משרות שתואמות את הסינון. נסו להרחיב את החיפוש.</p>
   </div>
 </Base>
 
 <script>
-  // חיפוש וסינון רצים בדפדפן על הכרטיסים שנבנו. אין קריאת רשת.
   const q = document.getElementById('q') as HTMLInputElement;
-  const loc = document.getElementById('location') as HTMLSelectElement;
+  const loc = document.getElementById('loc') as HTMLSelectElement;
   const scope = document.getElementById('scope') as HTMLSelectElement;
-  const reset = document.getElementById('reset') as HTMLButtonElement;
-  const cards = Array.from(document.querySelectorAll<HTMLElement>('.job-card'));
+  const cards = [...document.querySelectorAll<HTMLElement>('#grid .card')];
   const count = document.getElementById('count')!;
-  const empty = document.getElementById('empty')!;
-
-  const params = new URLSearchParams(location.search);
-  if (params.get('q')) q.value = params.get('q')!;
-  if (params.get('location')) loc.value = params.get('location')!;
-  if (params.get('scope')) scope.value = params.get('scope')!;
+  const noResults = document.getElementById('noresults')!;
 
   function apply() {
     const term = q.value.trim().toLowerCase();
-    const wantLoc = loc.value;
-    const wantScope = scope.value;
     let shown = 0;
-    for (const card of cards) {
-      const title = (card.dataset.title ?? '').toLowerCase();
-      const okTerm = !term || title.includes(term);
-      const okLoc = !wantLoc || card.dataset.location === wantLoc;
-      const okScope = !wantScope || card.dataset.scope === wantScope;
-      const show = okTerm && okLoc && okScope;
-      card.hidden = !show;
+    for (const c of cards) {
+      const okText = !term || (c.dataset.title ?? '').toLowerCase().includes(term);
+      const okLoc = !loc.value || c.dataset.location === loc.value;
+      const okScope = !scope.value || c.dataset.scope === scope.value;
+      const show = okText && okLoc && okScope;
+      c.hidden = !show;
       if (show) shown++;
     }
     count.textContent = String(shown);
-    empty.hidden = shown !== 0;
+    noResults.hidden = shown !== 0;
   }
   [q, loc, scope].forEach(el => el.addEventListener('input', apply));
-  reset.addEventListener('click', () => { q.value = ''; loc.value = ''; scope.value = ''; apply(); });
-  apply();
 </script>
 
 <style>
-  .wrap { padding-block: 36px; }
-  .head { margin-block-end: 20px; }
-  .muted { color: var(--ink-soft); }
-  .filters {
-    display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
-    background: var(--surface-card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 16px; margin-block-end: 24px;
-  }
-  .filters .grow { flex: 1 1 260px; }
+  .wrap { padding-block: 32px; }
+  .head { display: flex; align-items: baseline; gap: 12px; margin-block-end: 20px; }
+  .count { color: var(--ink-soft); }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-block-end: 24px; }
+  .filters .field.grow { flex: 1 1 260px; }
   .filters .field { flex: 0 0 auto; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .empty { text-align: center; color: var(--ink-soft); padding-block: 48px; }
-  @media (max-width: 620px) { .filters .field, .filters .btn { inline-size: 100%; } }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .empty { color: var(--ink-mid); background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; text-align: center; }
 </style>

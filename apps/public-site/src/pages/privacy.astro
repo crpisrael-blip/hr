@@ -1,20 +1,20 @@
 ---
 import Base from '../layouts/Base.astro';
-import { SITE } from '../data/site';
 ---
-<Base title="מדיניות פרטיות — ORT Tech" description="כיצד אנחנו אוספים, שומרים ומשתמשים במידע של מועמדים.">
-  <div class="page wrap measure stack" style="--gap: 18px">
+<Base title="מדיניות פרטיות — ort·hr" description="כיצד אנחנו אוספים, שומרים ומגנים על המידע האישי שלכם.">
+  <div class="page prose">
     <h1>מדיניות פרטיות</h1>
-    <p class="muted">טיוטה לדוגמה. הנוסח המחייב ייקבע על ידי {SITE.shortName} וייעוץ משפטי לפני העלייה לאוויר.</p>
-    <div><h2>איזה מידע אנחנו אוספים</h2><p>שם, טלפון, דוא״ל וקורות חיים שאתם מוסרים בעת הגשת מועמדות, ומידע על התקדמות המועמדות.</p></div>
-    <div><h2>למה אנחנו משתמשים בו</h2><p>לצורך תהליך הגיוס וההשמה בלבד: יצירת קשר, התאמה למשרות והגשה למעסיקים. איננו מוכרים מידע לצד שלישי.</p></div>
-    <div><h2>שמירה ומחיקה</h2><p>המידע נשמר כל עוד הוא רלוונטי לתהליך. אתם רשאים לבקש עיון, תיקון או מחיקה בכל עת דרך האזור האישי או פנייה אלינו.</p></div>
-    <div><h2>יצירת קשר</h2><p>בכל שאלה בנושא פרטיות: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p></div>
+    <p class="note">טיוטה ראשונית. הנוסח המחייב ייקבע עם ייעוץ משפטי לפני העלייה לאוויר.</p>
+    <p class="measure">אנחנו אוספים את הפרטים שאתם מוסרים בעת הגשת מועמדות: שם, טלפון, דוא״ל וקורות חיים. המידע משמש אך ורק לצורך הליך הגיוס וההשמה.</p>
+    <h2>שמירת מידע</h2>
+    <p class="measure">המידע נשמר בבסיס נתונים מאובטח באזור האיחוד האירופי. איננו מוחקים מידע באופן אוטומטי; מחיקה מתבצעת לפי בקשה.</p>
+    <h2>הזכויות שלכם</h2>
+    <p class="measure">אתם רשאים לבקש עיון, תיקון או מחיקה של המידע שלכם בכל עת, דרך <a href="/contact">עמוד יצירת הקשר</a>.</p>
   </div>
 </Base>
 <style>
-  .wrap { padding-block: 40px; }
-  .muted { color: var(--ink-soft); font-size: .9rem; }
-  h2 { margin-block-end: 6px; }
-  .wrap p { color: var(--ink-mid); }
+  .prose { padding-block: 32px 48px; }
+  .prose h2 { margin-block: 24px 10px; font-size: 1.2rem; }
+  .prose p { color: var(--ink-mid); margin-block-end: 12px; }
+  .note { background: var(--accent-soft); color: var(--accent); padding: 10px 14px; border-radius: var(--radius-sm); font-weight: 600; font-size: .9rem; }
 </style>

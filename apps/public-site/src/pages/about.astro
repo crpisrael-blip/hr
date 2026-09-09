@@ -1,41 +1,26 @@
 ---
 import Base from '../layouts/Base.astro';
-import { SITE } from '../data/site';
 ---
-<Base title="עלינו — ORT Tech" description="מי אנחנו וכיצד אנחנו עובדים. חברת גיוס והשמה עם יחס אישי ותהליך שקוף.">
-  <div class="page wrap stack" style="--gap: 28px">
-    <header class="stack" style="--gap: 12px">
-      <span class="eyebrow">עלינו</span>
-      <h1>גיוס שמתחיל מהתאמה, לא מקורות חיים</h1>
-      <p class="lead measure">
-        {SITE.shortName} היא חברת גיוס והשמה. אנחנו מלווים מועמדים ומעסיקים לאורך כל הדרך,
-        מהמשרה הראשונה ועד היום הראשון בעבודה, עם יחס אישי ותהליך שקוף.
-      </p>
-    </header>
-
-    <div class="values">
-      <div class="v"><h3>יחס אישי</h3><p>מגייס אחד מלווה אתכם לאורך התהליך ומכיר את התיק שלכם.</p></div>
-      <div class="v"><h3>שקיפות</h3><p>באזור האישי רואים בכל רגע באיזה שלב נמצאת כל מועמדות.</p></div>
-      <div class="v"><h3>מהירות</h3><p>זמן תגובה ממוצע של יום עבודה אחד מרגע ההגשה.</p></div>
-      <div class="v"><h3>דיסקרטיות</h3><p>הפרטים שלכם נשמרים ומשמשים לתהליך הגיוס בלבד.</p></div>
-    </div>
-
-    <section class="cta-band">
-      <div><h2>רוצים להתחיל?</h2><p>עברו על המשרות הפתוחות או השאירו פרטים.</p></div>
-      <a class="btn btn-primary" href="/jobs">לכל המשרות</a>
-    </section>
+<Base title="אודות — ort·hr" description="מי אנחנו, ואיך אנחנו עובדים בגיוס והשמה.">
+  <div class="page prose">
+    <h1>אודות</h1>
+    <p class="lede measure">אנחנו משרד גיוס והשמה שמאמין שגיוס טוב מתחיל בהקשבה. לא רק להתאים קורות חיים למשרה, אלא להבין מה מחפש כל צד ולחבר נכון.</p>
+    <h2>איך אנחנו עובדים</h2>
+    <p class="measure">כל מועמד מקבל מגייס אישי שמלווה אותו לאורך התהליך: מהשיחה הראשונה, דרך ההכנה לראיון, ועד המשא ומתן על התנאים. מול המעסיקים אנחנו מדייקים את הדרישות ומציגים רק מועמדים רלוונטיים, כדי לחסוך לכולם זמן.</p>
+    <h2>מה חשוב לנו</h2>
+    <ul class="measure">
+      <li>שקיפות מול המועמד לאורך כל שלב בתהליך.</li>
+      <li>שמירה קפדנית על פרטיות המידע האישי.</li>
+      <li>התאמה אמיתית, לא מילוי מכסות.</li>
+    </ul>
+    <p class="measure">מחפשים את הצעד הבא? <a href="/jobs">עיינו במשרות הפתוחות</a> או <a href="/contact">דברו איתנו</a>.</p>
   </div>
 </Base>
 <style>
-  .wrap { padding-block: 40px; }
-  .eyebrow { color: var(--brand); font-weight: 700; font-size: .9rem; }
-  .lead { color: var(--ink-mid); font-size: 1.08rem; }
-  .values { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-  .v { background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
-  .v h3 { color: var(--brand); margin-block-end: 6px; }
-  .v p { color: var(--ink-mid); font-size: .95rem; }
-  .cta-band { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
-    background: var(--brand); color: #fff; border-radius: var(--radius); padding: 28px; }
-  .cta-band h2, .cta-band p { color: #fff; }
-  .cta-band .btn-primary { background: #fff; color: var(--brand-ink); }
+  .prose { padding-block: 32px 48px; }
+  .prose h1 { margin-block-end: 14px; }
+  .prose h2 { margin-block: 28px 10px; font-size: 1.25rem; }
+  .lede { font-size: 1.12rem; color: var(--ink-mid); }
+  .prose p { color: var(--ink-mid); margin-block-end: 12px; }
+  .prose ul { color: var(--ink-mid); padding-inline-start: 20px; display: grid; gap: 8px; }
 </style>
