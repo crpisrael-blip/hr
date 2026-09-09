@@ -31,3 +31,12 @@ export const APP_STAGE: Record<string, string> = {
 export const SCOPE: Record<string, string> = {
   full_time: 'מלאה', part_time: 'חלקית', temporary: 'זמני', contract: 'חוזה', student: 'סטודנט',
 };
+
+export const COMMISSION_BASE: Record<string, string> = { monthly: 'חודשי', annual: 'שנתי' };
+export const PLACEMENT_STATUS: Record<string, string> = {
+  pending_start: 'ממתין לתחילת עבודה', working_warranty: 'בתקופת אחריות', approved: 'מאושרת',
+  not_started: 'לא התחיל', left_in_warranty: 'עזב בתקופת האחריות', cancelled: 'בוטלה',
+};
+export const INVOICE_STATUS: Record<string, string> = {
+  planned: 'מתוכנן', issued: 'הופק', partially_paid: 'שולם חלקית', paid: 'שולם', cancelled: 'בוטל', credited: 'זוכה',
+};

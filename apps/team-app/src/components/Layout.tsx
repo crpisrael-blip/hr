@@ -8,6 +8,7 @@ const NAV = [
   { to: '/jobs', label: 'משרות', icon: '▧' },
   { to: '/candidates', label: 'מועמדים', icon: '☺' },
   { to: '/applications', label: 'מועמדויות', icon: '➤' },
+  { to: '/placements', label: 'השמות', icon: '★' },
   { to: '/tasks', label: 'משימות', icon: '✓' },
 ];
 

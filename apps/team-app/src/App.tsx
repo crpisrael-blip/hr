@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
+import CompanyDetail from './pages/CompanyDetail';
 import CompanyNew from './pages/CompanyNew';
 import Jobs from './pages/Jobs';
 import JobNew from './pages/JobNew';
@@ -14,6 +15,9 @@ import Applications from './pages/Applications';
 import ApplicationNew from './pages/ApplicationNew';
 import ApplicationDetail from './pages/ApplicationDetail';
 import Tasks from './pages/Tasks';
+import Placements from './pages/Placements';
+import PlacementNew from './pages/PlacementNew';
+import PlacementDetail from './pages/PlacementDetail';
 
 export default function App() {
   const { session, employee, loading } = useAuth();
@@ -37,6 +41,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/companies" element={<Companies />} />
         <Route path="/companies/new" element={<CompanyNew />} />
+        <Route path="/companies/:id" element={<CompanyDetail />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/new" element={<JobNew />} />
         <Route path="/candidates" element={<Candidates />} />
@@ -46,6 +51,9 @@ export default function App() {
         <Route path="/applications/new" element={<ApplicationNew />} />
         <Route path="/applications/:id" element={<ApplicationDetail />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/placements" element={<Placements />} />
+        <Route path="/placements/new" element={<PlacementNew />} />
+        <Route path="/placements/:id" element={<PlacementDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

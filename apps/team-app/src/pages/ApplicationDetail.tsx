@@ -64,7 +64,10 @@ export default function ApplicationDetail() {
     <>
       <PageHead title={a.candidates?.full_name ?? 'מועמדות'}
         sub={`${a.jobs?.title ?? ''}${a.jobs?.companies?.name ? ' · ' + a.jobs.companies.name : ''}`}
-        action={<Link to={`/candidates/${a.candidate_id}`} className="btn btn-quiet btn-sm">לכרטיס המועמד</Link>} />
+        action={<>
+          {a.stage === 'hired' && <Link to={`/placements/new?application=${a.id}`} className="btn btn-primary btn-sm">יצירת השמה</Link>}
+          <Link to={`/candidates/${a.candidate_id}`} className="btn btn-quiet btn-sm">לכרטיס המועמד</Link>
+        </>} />
 
       <div className="grid2">
         <div className="card" style={{ padding: 20 }}>

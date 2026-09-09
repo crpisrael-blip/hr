@@ -29,7 +29,7 @@ export default function Companies() {
             <tbody>
               {rows.map(r => (
                 <tr key={r.id}>
-                  <td style={{ fontWeight: 600 }}>{r.name}</td>
+                  <td style={{ fontWeight: 600 }}><Link to={`/companies/${r.id}`}>{r.name}</Link></td>
                   <td><span className={'tag ' + (r.status === 'active' ? 'ok' : 'mute')}>{COMPANY_STATUS[r.status]}</span></td>
                   <td>{r.website ? <a href={r.website} target="_blank" rel="noreferrer">קישור</a> : '—'}</td>
                   <td className="num">{formatDate(r.created_at)}</td>
