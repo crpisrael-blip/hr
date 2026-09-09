@@ -27,6 +27,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { employee, signOut } = useAuth();
   return (
     <div className="shell">
+      <div className="app-bg" aria-hidden="true">
+        <span className="blob b1"></span><span className="blob b2"></span><span className="blob b3"></span>
+        <span className="dotgrid"></span>
+      </div>
       <aside className="side">
         <div className="side-logo">
           <picture>
@@ -73,10 +77,11 @@ export default function Layout({ children }: { children: ReactNode }) {
 }
 
 const css = `
-.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
-.side { position: sticky; top: 0; height: 100vh; background: var(--card);
-  border-inline-start: 1px solid var(--line); display: flex; flex-direction: column;
-  padding: 18px 14px; gap: 4px; }
+.shell { position: relative; z-index: 1; display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.side { position: sticky; top: 12px; height: calc(100vh - 24px); margin: 12px 0; margin-inline-end: 12px;
+  background: var(--card); border: 1px solid var(--card-brd); border-radius: 20px;
+  backdrop-filter: blur(16px) saturate(140%); box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; padding: 18px 14px; gap: 4px; }
 .side-logo { padding: 6px 10px 18px; }
 .side-logo img { height: 30px; width: auto; display: block; }
 .side nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
@@ -102,18 +107,18 @@ const css = `
 .who-role { font-size: .74rem; color: var(--ink-soft); }
 .main { display: flex; flex-direction: column; min-width: 0; }
 .topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px;
-  padding: 12px 24px; background: color-mix(in srgb, var(--surface) 85%, transparent);
-  backdrop-filter: saturate(140%) blur(8px); border-bottom: 1px solid var(--line); }
+  padding: 14px 24px; }
 .search { position: relative; flex: 1; max-width: 560px; }
-.search input { padding-inline-start: 38px; padding-inline-end: 52px; min-height: 42px; border-radius: 10px; background: var(--card); }
+.search input { padding-inline-start: 38px; padding-inline-end: 52px; min-height: 44px; border-radius: 13px;
+  background: var(--card); border: 1px solid var(--card-brd); backdrop-filter: blur(12px); box-shadow: var(--shadow-sm); }
 .search .s-ic { position: absolute; inset-inline-start: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-size: 1.1rem; }
 .search kbd { position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%);
   font: inherit; font-size: .72rem; color: var(--ink-soft); background: var(--sunk);
   border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
-.bell { margin-inline-start: auto; width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--card); cursor: pointer; font-size: 1.05rem;
-  transition-property: background-color; transition-duration: 130ms; }
-.bell:hover { background: var(--sunk); }
+.bell { margin-inline-start: auto; width: 44px; height: 44px; border-radius: 13px; border: 1px solid var(--card-brd);
+  background: var(--card); backdrop-filter: blur(12px); box-shadow: var(--shadow-sm); cursor: pointer; font-size: 1.05rem;
+  transition-property: background-color, transform; transition-duration: 130ms; }
+.bell:hover { background: var(--sunk); } .bell:active { transform: scale(.96); }
 .content { padding: 24px; max-width: 1280px; width: 100%; }
 @media (max-width: 820px) {
   .shell { grid-template-columns: 1fr; }

@@ -139,8 +139,13 @@ function Empty({ children }: { children: ReactNodeLike }) { return <p className=
 
 const dashCss = `
 .dash { display: grid; gap: 20px; }
-.hero { position: relative; overflow: hidden; border-radius: 16px; padding: 40px 32px;
-  background: linear-gradient(120deg, var(--brand) 0%, #17205e 55%, #24347e 100%); color: #fff; }
+.hero { position: relative; overflow: hidden; border-radius: 22px; padding: 38px 30px; color: #fff;
+  background:
+    radial-gradient(70% 130% at 12% 15%, #3348c6 0%, transparent 55%),
+    radial-gradient(60% 120% at 88% 8%, #7ba6f4 0%, transparent 45%),
+    radial-gradient(90% 140% at 60% 130%, #0b0d3c 0%, transparent 60%),
+    linear-gradient(120deg, #141a63, #0c0f42);
+  box-shadow: 0 24px 60px -20px rgba(20,26,90,.55); }
 .hero-bg { position: absolute; inset: 0; pointer-events: none; opacity: .16; }
 .hero-bg .hp { position: absolute; color: var(--accent); font-weight: 700; white-space: nowrap; }
 .hero-bg .hp0 { top: 14%; inset-inline-start: 6%; font-size: 2.4rem; transform: rotate(-8deg); }
@@ -158,17 +163,18 @@ const dashCss = `
 .btn-ghost:hover { background: rgba(255,255,255,.2); }
 
 .tiles { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-.tile { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-  padding: 18px 20px; display: grid; gap: 2px; text-decoration: none; color: inherit; box-shadow: var(--shadow-sm);
-  transition-property: transform, border-color, box-shadow; transition-duration: 140ms; transition-timing-function: ease-out; }
+.tile { position: relative; background: var(--card); border: 1px solid var(--card-brd); border-radius: 17px;
+  padding: 18px 20px; display: grid; gap: 2px; text-decoration: none; color: inherit; box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition-property: transform, box-shadow; transition-duration: 140ms; transition-timing-function: ease-out; }
 .tile:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
 .tile-ic { position: absolute; inset-inline-end: 16px; top: 16px; width: 40px; height: 40px; border-radius: 11px;
   display: grid; place-items: center; background: var(--brand-soft); font-size: 1.1rem; }
-.tile-val { font-size: 2.1rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tile-val { font-family: var(--disp); font-size: 2.1rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .tile-lbl { color: var(--ink-mid); font-size: .9rem; }
 
 .cols { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); }
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.panel { background: var(--card); border: 1px solid var(--card-brd); border-radius: 18px; box-shadow: var(--shadow-md); backdrop-filter: blur(14px) saturate(140%); overflow: hidden; }
 .panel > header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
 .panel h2 { font-size: 1.02rem; }
 .more { font-size: .84rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
