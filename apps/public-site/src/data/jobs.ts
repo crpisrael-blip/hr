@@ -27,10 +27,25 @@ export const SCOPE_LABEL: Record<EmploymentScope, string> = {
  * פרסום או סגירה של משרה מפעילים בנייה מחדש.
  */
 export async function loadJobs(): Promise<Job[]> {
-  const url = process.env.DATABASE_URL;
+  let url = process.env.DATABASE_URL?.trim();
+
+  // ניקוי טעויות הדבקה נפוצות: גרשיים עוטפים, קידומת DATABASE_URL=.
+  if (url && /^DATABASE_URL=/.test(url)) url = url.replace(/^DATABASE_URL=/, '').trim();
+  if (url && ((url.startsWith('"') && url.endsWith('"')) || (url.startsWith("'") && url.endsWith("'")))) {
+    url = url.slice(1, -1).trim();
+  }
+
   if (!url) {
     console.warn('[jobs] DATABASE_URL לא הוגדר — נבנה מנתוני הדגמה');
     return sortJobs(fixtures as Job[]);
+  }
+
+  // אבחון ברור במקום "Invalid URL" של postgres.
+  if (url.includes('[') || url.includes(']') || url.toUpperCase().includes('YOUR-PASSWORD')) {
+    throw new Error('[jobs] DATABASE_URL עדיין מכיל סוגריים או את התבנית [YOUR-PASSWORD]. החליפו בסיסמה האמיתית, בלי הסוגריים.');
+  }
+  try { new URL(url); } catch {
+    throw new Error('[jobs] DATABASE_URL אינו כתובת תקינה. בדקו רווח/ירידת שורה, או תו מיוחד בסיסמה שצריך קידוד (@=%40, #=%23, /=%2F).');
   }
 
   const { default: postgres } = await import('postgres');
