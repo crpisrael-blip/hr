@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 import { formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
 
@@ -15,7 +16,7 @@ export default function Candidates() {
   }, []);
   return (
     <>
-      <PageHead title="מועמדים" sub="מאגר המועמדים" />
+      <PageHead title="מועמדים" sub="מאגר המועמדים" action={<Link to="/candidates/new" className="btn btn-primary btn-sm">+ מועמד חדש</Link>} />
       {err && <p className="msg err">{err}</p>}
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין מועמדים. הם ייווצרו מהגשות באתר או מייבוא.</div>}
@@ -24,7 +25,7 @@ export default function Candidates() {
           <table>
             <thead><tr><th>שם</th><th>טלפון</th><th>דוא״ל</th><th>מקור</th><th>נוצר</th></tr></thead>
             <tbody>{rows.map(r => (
-              <tr key={r.id}><td style={{ fontWeight: 600 }}>{r.full_name}</td>
+              <tr key={r.id}><td style={{ fontWeight: 600 }}><Link to={`/candidates/${r.id}`}>{r.full_name}</Link></td>
                 <td>{r.phone_raw ?? '—'}</td><td>{r.email ?? '—'}</td>
                 <td>{r.source ?? '—'}</td><td className="num">{formatDate(r.created_at)}</td></tr>
             ))}</tbody>

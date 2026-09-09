@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 import { APP_STAGE, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
 
@@ -17,7 +18,7 @@ export default function Applications() {
   }, []);
   return (
     <>
-      <PageHead title="מועמדויות" sub="תהליכי גיוס פעילים" />
+      <PageHead title="מועמדויות" sub="תהליכי גיוס פעילים" action={<Link to="/applications/new" className="btn btn-primary btn-sm">+ מועמדות חדשה</Link>} />
       {err && <p className="msg err">{err}</p>}
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין מועמדויות.</div>}
@@ -26,7 +27,7 @@ export default function Applications() {
           <table>
             <thead><tr><th>מועמד</th><th>משרה</th><th>שלב</th><th>עודכן</th></tr></thead>
             <tbody>{rows.map(r => (
-              <tr key={r.id}><td style={{ fontWeight: 600 }}>{r.candidates?.full_name ?? '—'}</td>
+              <tr key={r.id}><td style={{ fontWeight: 600 }}><Link to={`/applications/${r.id}`}>{r.candidates?.full_name ?? '—'}</Link></td>
                 <td>{r.jobs?.title ?? '—'}</td>
                 <td><span className="tag brand">{APP_STAGE[r.stage]}</span></td>
                 <td className="num">{formatDate(r.stage_changed_at)}</td></tr>

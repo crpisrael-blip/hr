@@ -8,7 +8,11 @@ import CompanyNew from './pages/CompanyNew';
 import Jobs from './pages/Jobs';
 import JobNew from './pages/JobNew';
 import Candidates from './pages/Candidates';
+import CandidateNew from './pages/CandidateNew';
+import CandidateDetail from './pages/CandidateDetail';
 import Applications from './pages/Applications';
+import ApplicationNew from './pages/ApplicationNew';
+import ApplicationDetail from './pages/ApplicationDetail';
 import Tasks from './pages/Tasks';
 
 export default function App() {
@@ -36,7 +40,11 @@ export default function App() {
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/new" element={<JobNew />} />
         <Route path="/candidates" element={<Candidates />} />
+        <Route path="/candidates/new" element={<CandidateNew />} />
+        <Route path="/candidates/:id" element={<CandidateDetail />} />
         <Route path="/applications" element={<Applications />} />
+        <Route path="/applications/new" element={<ApplicationNew />} />
+        <Route path="/applications/:id" element={<ApplicationDetail />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
