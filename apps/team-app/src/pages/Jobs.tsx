@@ -67,30 +67,21 @@ export default function Jobs() {
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין משרות.</div>}
       {rows && rows.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <table>
-            <thead><tr><th>תפקיד</th><th>חברה</th><th>מיקום</th><th>היקף</th><th>תקנים</th><th>שלב</th><th>פרסום</th><th></th></tr></thead>
-            <tbody>
+        <div className="record-grid">
               {rows.map(r => {
                 const pub = isPublished(r);
                 return (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{r.title}</td>
-                    <td>{r.companies?.name ?? '—'}</td>
-                    <td>{r.location ?? '—'}</td>
-                    <td>{r.employment_scope ? SCOPE[r.employment_scope] : '—'}</td>
-                    <td className="num">{r.headcount}</td>
-                    <td><span className="tag mute">{JOB_STAGE[r.stage]}</span></td>
-                    <td>{pub ? <span className="tag ok">מפורסמת</span> : <span className="tag">לא מפורסמת</span>}</td>
-                    <td>{pub
+                  <article className="card record-card" key={r.id}>
+                    <header><span className="tag brand">{JOB_STAGE[r.stage]}</span>{pub ? <span className="tag ok">מפורסמת</span> : <span className="tag">לא מפורסמת</span>}</header>
+                    <h2>{r.title}</h2>
+                    <dl><dt>חברה</dt><dd>{r.companies?.name ?? '—'}</dd><dt>מיקום</dt><dd>{r.location ?? '—'}</dd><dt>היקף</dt><dd>{r.employment_scope ? SCOPE[r.employment_scope] : '—'}</dd></dl>
+                    <footer><span className="hint">{r.headcount} תקנים</span>{pub
                       ? <button className="btn btn-quiet btn-sm" disabled={busy===r.id} onClick={() => unpublish(r)}>הסרה</button>
                       : <button className="btn btn-primary btn-sm" disabled={busy===r.id} onClick={() => publish(r)}>{busy===r.id?'…':'פרסום'}</button>}
-                    </td>
-                  </tr>
+                    </footer>
+                  </article>
                 );
               })}
-            </tbody>
-          </table>
         </div>
       )}
       <p className="hint" style={{ marginTop: 12 }}>פרסום משרה יופיע באתר הציבורי לאחר בנייה מחדש של האתר.</p>

@@ -26,7 +26,8 @@ function initials(name?: string) {
 export default function Layout({ children }: { children: ReactNode }) {
   const { employee, signOut } = useAuth();
   return (
-    <div className="shell">
+    <div className="shell" dir="rtl">
+      <a className="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
       <div className="app-bg" aria-hidden="true">
         <span className="blob b1"></span><span className="blob b2"></span><span className="blob b3"></span>
         <span className="dotgrid"></span>
@@ -34,11 +35,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       <aside className="side">
         <div className="side-logo">
           <picture>
-            <source srcSet="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
             <img src="/ursa-logo.png" alt="URSA GROUP" />
           </picture>
         </div>
-        <nav>
+        <nav aria-label="תפריט ראשי">
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} end={n.end}
               className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
@@ -69,7 +69,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <button className="bell" aria-label="התראות">🔔</button>
           <span className="ava sm" title={employee?.full_name}>{initials(employee?.full_name)}</span>
         </header>
-        <div className="content">{children}</div>
+        <main className="content" id="main-content" tabIndex={-1}>{children}</main>
       </div>
       <style>{css}</style>
     </div>

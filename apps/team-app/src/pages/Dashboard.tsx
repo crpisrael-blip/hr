@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { formatDate } from '../lib/format';
+import RecruitmentArt from '../components/RecruitmentArt';
 
 const HERO_PHRASES = ['אנשים', 'הזדמנויות', 'צמיחה', 'מקומות', 'כישרון', 'הצלחה'];
 
@@ -57,11 +58,12 @@ export default function Dashboard() {
   return (
     <div className="dash">
       <section className="hero">
+        <RecruitmentArt />
         <div className="hero-bg" aria-hidden="true">
           {HERO_PHRASES.map((p, i) => <span key={i} className={`hp hp${i}`}>{p}</span>)}
         </div>
         <div className="hero-in">
-          <p className="eyebrow">People · Opportunities · Growth</p>
+          <p className="eyebrow">URSA GROUP · גיוס והשמה</p>
           <h1>מחברים בין אנשים להזדמנויות</h1>
           <p className="lede">גיוס והשמה שעושים את ההבדל. מכאן מנהלים את כל התהליך, מהמשרה ועד ההשמה.</p>
           <div className="hero-cta">
