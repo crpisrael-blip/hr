@@ -57,7 +57,7 @@ export default function Forms() {
 
       {tab==='instances' && (
         insts.length===0 ? <div className="card empty">לא נשלחו טפסים עדיין.</div> : (
-          <div className="card" style={{ overflow:'hidden' }}>
+          <div className="card" style={{ overflowX:'auto' }}>
             <table>
               <thead><tr><th>טופס</th><th>נמען</th><th>סוג</th><th>מצב</th><th>נוצר</th></tr></thead>
               <tbody>{insts.map(i => (

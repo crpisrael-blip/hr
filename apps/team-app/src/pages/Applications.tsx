@@ -23,7 +23,7 @@ export default function Applications() {
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין מועמדויות.</div>}
       {rows && rows.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table>
             <thead><tr><th>מועמד</th><th>משרה</th><th>שלב</th><th>עודכן</th></tr></thead>
             <tbody>{rows.map(r => (

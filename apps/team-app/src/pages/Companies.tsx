@@ -23,7 +23,7 @@ export default function Companies() {
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין חברות. הקימו את הראשונה.</div>}
       {rows && rows.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table>
             <thead><tr><th>שם</th><th>סטטוס</th><th>אתר</th><th>נוצרה</th></tr></thead>
             <tbody>

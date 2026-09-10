@@ -20,7 +20,7 @@ export default function Placements() {
       {!rows && !err && <p className="spinner">טוען…</p>}
       {rows && rows.length === 0 && <div className="card empty">אין עדיין השמות. השמה נוצרת ממועמדות שהתקבלה.</div>}
       {rows && rows.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table>
             <thead><tr><th>מועמד</th><th>חברה</th><th>שכר</th><th>עמלה צפויה</th><th>תחילת עבודה</th><th>סיום אחריות</th><th>מצב</th></tr></thead>
             <tbody>{rows.map(r => (

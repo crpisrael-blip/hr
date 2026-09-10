@@ -41,7 +41,7 @@ export default function Settings() {
       </div>
 
       {tab==='users' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table>
             <thead><tr><th>שם</th><th>דוא״ל</th><th>תפקיד</th><th>מצב</th></tr></thead>
             <tbody>{emps.map(e => (
@@ -60,7 +60,7 @@ export default function Settings() {
       )}
 
       {tab==='stages' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table>
             <thead><tr><th>שלב פנימי</th><th>נחשף למועמד</th><th>תווית למועמד</th><th>טקסט הסבר</th><th>מה המועמד רואה</th></tr></thead>
             <tbody>{stages.map(s => (
