@@ -6,7 +6,11 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "build": "npm run build --workspace=@hr/team-app",
-    "db:test": "./scripts/db-test.sh"
+    "build:team": "npm run build --workspace=@hr/team-app",
+    "build:candidate": "npm run build --workspace=@hr/candidate-app",
+    "build:public": "npm run build --workspace=@hr/public-site",
+    "db:test": "./scripts/db-test.sh",
+    "db:schema": "./scripts/build-schema.sh"
   },
   "engines": { "node": ">=20" }
 }
