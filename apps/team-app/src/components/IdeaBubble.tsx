@@ -30,8 +30,10 @@ function screenLabel(path: string) {
   for (const [re, label] of SCREENS) if (re.test(path)) return label;
   return path;
 }
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+// תצורת המכשיר בזמן הלכידה — נייד או נייח.
+function deviceType(): 'נייד' | 'נייח' {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return (coarse || window.innerWidth < 768) ? 'נייד' : 'נייח';
 }
 
 export default function IdeaBubble() {
@@ -89,8 +91,9 @@ export default function IdeaBubble() {
     const text = body.trim();
     if (!text) return;
     setBusy(true);
-    const { error } = await supabase.from('dev_ideas')
-      .insert({ kind, body: text, context: screenLabel(pathname) });
+    // ההקשר: המסך + תצורת המכשיר (נייד/נייח).
+    const context = `${screenLabel(pathname)} · ${deviceType()}`;
+    const { error } = await supabase.from('dev_ideas').insert({ kind, body: text, context });
     setBusy(false);
     if (!error) { setBody(''); load(); }
   }
@@ -111,10 +114,10 @@ export default function IdeaBubble() {
       const rows = active.filter(i => i.kind === k);
       if (!rows.length) return '';
       const lines = rows.map((i, n) =>
-        `${n + 1}. ${i.body}${i.status === 'in_progress' ? ' [בעבודה]' : ''}\n   מסך: ${i.context ?? '—'} · ${fmtDate(i.created_at)}`).join('\n');
+        `${n + 1}. ${i.body}${i.status === 'in_progress' ? ' [בעבודה]' : ''}\n   ${i.context ?? '—'}`).join('\n');
       return `## ${label} (${rows.length})\n${lines}`;
     }).filter(Boolean);
-    const header = `משוב שנלכד ממערכת URSA GROUP — ${active.length} פריטים פעילים\nנוצר: ${new Date().toLocaleString('he-IL')}`;
+    const header = `משוב שנלכד ממערכת URSA GROUP — ${active.length} פריטים פעילים`;
     const text = [header, ...groups].join('\n\n');
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
   }
@@ -138,6 +141,7 @@ export default function IdeaBubble() {
             <button className="ib-x" onClick={() => setOpen(false)} aria-label="סגירה" title="סגירה">×</button>
           </div>
 
+          {/* אייקוני סוג בשורה נפרדת */}
           <div className="ib-kinds">
             {KINDS.map(x => (
               <button key={x.k} className={'ib-kind' + (kind === x.k ? ' on' : '')} onClick={() => setKind(x.k)}
@@ -145,11 +149,16 @@ export default function IdeaBubble() {
                 <span aria-hidden="true">{x.icon}</span>
               </button>
             ))}
-            <textarea className="ib-ta" value={body} onChange={e => setBody(e.target.value)} autoFocus rows={2}
-              placeholder={`${KMAP[kind].label}…`}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save(); }} />
+          </div>
+
+          {/* שדה הרישום — שורה מלאה מתחת לאייקונים, יותר מקום */}
+          <textarea className="ib-ta" value={body} onChange={e => setBody(e.target.value)} autoFocus rows={3}
+            placeholder={`${KMAP[kind].label}…`}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save(); }} />
+          <div className="ib-actions">
+            <span className="ib-hint">Ctrl/⌘ + Enter</span>
             <button className="ib-icon ib-save" onClick={save} disabled={busy || !body.trim()}
-              title="שמירה (Ctrl/⌘+Enter)" aria-label="שמירה">{busy ? '…' : '＋'}</button>
+              title="שמירה" aria-label="שמירה">{busy ? '…' : '＋'}</button>
           </div>
 
           <div className="ib-list-head">
@@ -167,7 +176,7 @@ export default function IdeaBubble() {
                   <p className="ib-body">{i.body}</p>
                 </div>
                 <div className="ib-meta">
-                  <span className="ib-ctx">{i.context ?? '—'} · {fmtDate(i.created_at)}</span>
+                  <span className="ib-ctx">{i.context ?? '—'}</span>
                   <span className="ib-row-actions">
                     <button className={i.status === 'in_progress' ? 'on' : ''} title="בעבודה" aria-label="בעבודה"
                       onClick={() => toggle(i, 'in_progress')}>⏳</button>
@@ -203,26 +212,28 @@ export default function IdeaBubble() {
 
         .ib-panel { z-index: 9002; background: #fff; color: #0d1230; border: 1px solid #e7edf8; border-radius: 14px;
           box-shadow: 0 20px 50px #12225026; padding: 10px; font-family: 'Heebo', system-ui, sans-serif;
-          display: flex; flex-direction: column; gap: 8px; max-height: min(72vh, 520px); }
+          display: flex; flex-direction: column; gap: 8px; max-height: min(74vh, 540px); }
         .ib-head { display: flex; justify-content: space-between; align-items: center; }
         .ib-head strong { font-size: .92rem; color: #080838; }
         .ib-x { border: 0; background: #f2f4f9; width: 24px; height: 24px; border-radius: 7px; font-size: 16px;
           color: #4a5578; cursor: pointer; line-height: 1; }
 
-        /* שורת לכידה קומפקטית: אייקוני סוג + טקסט + שמירה */
-        .ib-kinds { display: flex; align-items: stretch; gap: 5px; flex-wrap: wrap; }
-        .ib-kind { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #e7edf8; background: #f4f8ff;
-          font-size: 16px; cursor: pointer; display: grid; place-items: center; padding: 0; flex: 0 0 auto; }
+        .ib-kinds { display: flex; align-items: center; gap: 6px; }
+        .ib-kind { width: 34px; height: 34px; border-radius: 9px; border: 1.5px solid #e7edf8; background: #f4f8ff;
+          font-size: 17px; cursor: pointer; display: grid; place-items: center; padding: 0; flex: 0 0 auto; }
         .ib-kind.on { border-color: #90c0f8; background: #dcebfd; box-shadow: 0 0 0 1px #90c0f8 inset; }
-        .ib-ta { flex: 1 1 120px; min-width: 100px; min-height: 32px; resize: vertical; font: inherit; font-size: .9rem;
-          padding: 6px 9px; color: #0d1230; border: 1.5px solid #e7edf8; border-radius: 9px; background: #f4f8ff; }
-        .ib-ta:focus { outline: none; border-color: #90c0f8; background: #fff; }
 
-        .ib-icon { width: 32px; height: 32px; border-radius: 8px; border: 0; cursor: pointer; font-size: 15px;
+        .ib-ta { width: 100%; min-height: 62px; resize: vertical; font: inherit; font-size: .92rem;
+          padding: 9px 11px; color: #0d1230; border: 1.5px solid #e7edf8; border-radius: 10px; background: #f4f8ff; }
+        .ib-ta:focus { outline: none; border-color: #90c0f8; background: #fff; }
+        .ib-actions { display: flex; align-items: center; justify-content: space-between; }
+        .ib-hint { color: #7d87a6; font-size: .72rem; }
+
+        .ib-icon { width: 34px; height: 34px; border-radius: 9px; border: 0; cursor: pointer;
           display: grid; place-items: center; flex: 0 0 auto; padding: 0; }
-        .ib-save { background: linear-gradient(120deg, #080838, #171763); color: #fff; font-size: 20px; font-weight: 700; }
+        .ib-save { background: linear-gradient(120deg, #080838, #171763); color: #fff; font-size: 21px; font-weight: 700; }
         .ib-save:disabled { opacity: .45; cursor: default; }
-        .ib-copy { border: 1px solid #90c0f8; background: #dcebfd; color: #080838; }
+        .ib-copy { border: 1px solid #90c0f8; background: #dcebfd; color: #080838; font-size: 15px; }
         .ib-copy:disabled { opacity: .45; cursor: default; }
 
         .ib-list-head { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #eef2fa;
