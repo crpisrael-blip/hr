@@ -6,7 +6,7 @@ const { slug, jobTitle } = Astro.props;
 const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
 ---
 <form class="apply" data-endpoint={endpoint} data-slug={slug} novalidate>
-  <input type="hidden" name="job_slug" value={slug} />
+  <input type="hidden" name="slug" value={slug} />
   <!-- מלכודת בוטים. בני אדם לא ממלאים שדה מוסתר. -->
   <input type="text" name="company_website" tabindex="-1" autocomplete="off" class="visually-hidden" aria-hidden="true" />
 
@@ -34,7 +34,7 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
   </div>
 
   <label class="consent">
-    <input type="checkbox" name="data_use" required />
+    <input type="checkbox" name="consent" value="true" required />
     <span>אני מאשר/ת שימוש בפרטים שלי לצורך תהליך הגיוס, לפי <a href="/privacy">מדיניות הפרטיות</a>.</span>
   </label>
 
