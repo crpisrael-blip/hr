@@ -24,6 +24,8 @@ import Reports from './pages/Reports';
 import Settlements from './pages/Settlements';
 import Settings from './pages/Settings';
 import Soon from './pages/Soon';
+import Employees from './pages/Employees';
+import EmployeeDetail from './pages/EmployeeDetail';
 import IdeaBubble from './components/IdeaBubble';
 
 export default function App() {
@@ -65,6 +67,8 @@ export default function App() {
         <Route path="/placements" element={<Placements />} />
         <Route path="/placements/new" element={<PlacementNew />} />
         <Route path="/placements/:id" element={<PlacementDetail />} />
+        <Route path="/employees" element={<Employees />} />
+        <Route path="/employees/:id" element={<EmployeeDetail />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/finance" element={<Settlements />} />
         <Route path="/settlements" element={<Navigate to="/finance" replace />} />
