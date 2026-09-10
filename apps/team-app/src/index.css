@@ -47,12 +47,7 @@
 html { -webkit-font-smoothing: antialiased; }
 body {
   margin: 0; color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.55;
-  background:
-    radial-gradient(60% 55% at 82% 6%, var(--g4) 0%, transparent 60%),
-    radial-gradient(55% 50% at 10% 18%, var(--g2) 0%, transparent 55%),
-    radial-gradient(70% 60% at 55% 115%, var(--g1) 0%, transparent 60%),
-    var(--g3);
-  background-attachment: fixed; min-height: 100vh;
+  min-height: 100vh;
 }
 h1,h2,h3 { margin: 0; line-height: 1.25; font-weight: 700; letter-spacing: -.01em; }
 h1,h2 { font-family: var(--disp); text-wrap: balance; }
@@ -61,18 +56,6 @@ button { font: inherit; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 5px; }
 
-/* אלמנטים רכים ברקע, מאחורי הכל */
-.app-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.app-bg .blob { position: absolute; border-radius: 50%; filter: blur(64px); }
-.app-bg .b1 { width: 440px; height: 440px; background: #8fbdf7; opacity: .40; top: -140px; inset-inline-end: -90px; }
-.app-bg .b2 { width: 380px; height: 380px; background: #5f6fe0; opacity: .26; top: 38%; inset-inline-start: -140px; }
-.app-bg .b3 { width: 320px; height: 320px; background: #a99cf2; opacity: .22; bottom: -140px; inset-inline-end: 20%; }
-.app-bg .dotgrid { position: absolute; inset: 0; opacity: .5; color: rgba(40,60,140,.10);
-  background-image: radial-gradient(currentColor .8px, transparent .8px); background-size: 26px 26px; }
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .app-bg .dotgrid { color: rgba(150,180,255,.08); } }
-:root[data-theme="dark"] .app-bg .dotgrid { color: rgba(150,180,255,.08); }
-@media (prefers-reduced-motion: no-preference){ .app-bg .blob { animation: drift 22s ease-in-out infinite alternate; } }
-@keyframes drift { to { transform: translate3d(0,-18px,0) scale(1.05); } }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px;
   padding: 9px 17px; border-radius: var(--radius-sm); border: 1px solid transparent; font-weight: 600;
@@ -83,7 +66,7 @@ button { font: inherit; }
 .btn-primary:hover { background: var(--brand-hover); }
 .btn-accent { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
 .btn-accent:hover { filter: brightness(.97); }
-.btn-quiet { background: var(--card); color: var(--ink); border-color: var(--card-brd); backdrop-filter: blur(10px); }
+.btn-quiet { background: var(--card); color: var(--ink); border-color: var(--card-brd); }
 .btn-quiet:hover { background: var(--sunk); }
 .btn-sm { min-height: 32px; padding: 5px 12px; font-size: .87rem; border-radius: 8px; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
@@ -91,7 +74,7 @@ button { font: inherit; }
 label { display: block; }
 .lbl { font-weight: 600; font-size: .87rem; margin-bottom: 5px; }
 input, select, textarea { width: 100%; min-height: 40px; padding: 8px 11px; font: inherit; color: var(--ink);
-  background: var(--card); border: 1px solid var(--card-brd); border-radius: var(--radius-sm); backdrop-filter: blur(8px); }
+  background: var(--card); border: 1px solid var(--card-brd); border-radius: var(--radius-sm); }
 textarea { min-height: 96px; resize: vertical; }
 .hint { color: var(--ink-soft); font-size: .8rem; margin-top: 4px; }
 
@@ -104,7 +87,7 @@ textarea { min-height: 96px; resize: vertical; }
 
 /* כרטיס זכוכית מרחף — משמש בכל המסכים */
 .card { background: var(--card); border: 1px solid var(--card-brd); border-radius: var(--radius);
-  box-shadow: var(--shadow-md); backdrop-filter: blur(14px) saturate(140%); }
+  box-shadow: var(--shadow-md); }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: right; padding: 11px 14px; border-bottom: 1px solid var(--line); }

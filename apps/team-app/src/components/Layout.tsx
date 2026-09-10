@@ -30,10 +30,6 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className={"shell" + (isHome ? " home-shell" : "")} dir="rtl">
       <a className="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
-      <div className="app-bg" aria-hidden="true">
-        <span className="blob b1"></span><span className="blob b2"></span><span className="blob b3"></span>
-        <span className="dotgrid"></span>
-      </div>
       <aside className="side">
         <div className="side-logo">
           <picture>
