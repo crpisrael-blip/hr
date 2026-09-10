@@ -8,6 +8,7 @@ import CompanyDetail from './pages/CompanyDetail';
 import CompanyNew from './pages/CompanyNew';
 import Jobs from './pages/Jobs';
 import JobNew from './pages/JobNew';
+import JobDetail from './pages/JobDetail';
 import Candidates from './pages/Candidates';
 import CandidateNew from './pages/CandidateNew';
 import CandidateDetail from './pages/CandidateDetail';
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/new" element={<JobNew />} />
         <Route path="/jobs/:id/edit" element={<JobNew />} />
+        <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/candidates" element={<Candidates />} />
         <Route path="/candidates/new" element={<CandidateNew />} />
         <Route path="/candidates/:id/edit" element={<CandidateNew />} />

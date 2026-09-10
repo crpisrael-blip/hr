@@ -73,7 +73,7 @@ export default function Jobs() {
                 return (
                   <article className="card record-card" key={r.id}>
                     <header><span className="tag brand">{JOB_STAGE[r.stage]}</span>{pub ? <span className="tag ok">מפורסמת</span> : <span className="tag">לא מפורסמת</span>}</header>
-                    <h2>{r.title}</h2>
+                    <h2><Link to={`/jobs/${r.id}`}>{r.title}</Link></h2>
                     <dl><dt>חברה</dt><dd>{r.companies?.name ?? '—'}</dd><dt>מיקום</dt><dd>{r.location ?? '—'}</dd><dt>היקף</dt><dd>{r.employment_scope ? SCOPE[r.employment_scope] : '—'}</dd></dl>
                     <footer><span className="hint">{r.headcount} תקנים</span>
                       <span style={{ display: 'flex', gap: 8 }}>
