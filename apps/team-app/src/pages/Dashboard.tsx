@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, fin } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { formatDate } from '../lib/format';
 import Icon from '../components/Icon';
@@ -27,7 +27,7 @@ export default function Dashboard() {
           count(supabase.from('candidates').select('*', { count: 'exact', head: true })),
           count(supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('stage', 'open')),
           count(supabase.from('companies').select('*', { count: 'exact', head: true }).eq('status', 'active')),
-          count(supabase.from('placements').select('*', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString())),
+          count(fin.from('placements').select('*', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString())),
         ]);
         setC({ candidates, jobsOpen, companies, placementsMonth });
       } catch (e: any) { setErr(e.message ?? 'שגיאה'); }

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fin } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { money, formatDate, PLACEMENT_STATUS } from '../lib/format';
 import PageHead from '../components/PageHead';
@@ -47,10 +47,10 @@ function Monthly({ emps }: { emps: any[] }) {
   async function loadCalc() {
     if (!emp) return;
     const m0 = month + '-01';
-    const c = await supabase.from('bonus_calculations').select('*').eq('employee_id', emp).eq('period_month', m0).maybeSingle();
+    const c = await fin.from('bonus_calculations').select('*').eq('employee_id', emp).eq('period_month', m0).maybeSingle();
     setCalc(c.data ?? null);
     if (c.data) {
-      const l = await supabase.from('bonus_calculation_lines').select('*, placements(applications(candidates(full_name)))').eq('calculation_id', c.data.id);
+      const l = await fin.from('bonus_calculation_lines').select('*, placements(applications(candidates(full_name)))').eq('calculation_id', c.data.id);
       if (!l.error) setLines(l.data);
     } else setLines([]);
   }
@@ -112,13 +112,13 @@ function Plans({ emps }: { emps: any[] }) {
   const [f, setF] = useState({ employee_id:'', metric:'placements_count', target_a:'2', target_b:'4', pct_tier_1:'5', pct_tier_2:'8' });
   const [err, setErr] = useState('');
   const set=(k:string,v:string)=>setF(s=>({...s,[k]:v}));
-  async function load(){ const r=await supabase.from('bonus_plans').select('*, employees(full_name)').order('valid_from',{ascending:false}); if(!r.error) setRows(r.data); }
+  async function load(){ const r=await fin.from('bonus_plans').select('*, employees(full_name)').order('valid_from',{ascending:false}); if(!r.error) setRows(r.data); }
   useEffect(()=>{ load(); },[]);
   async function add(e: FormEvent){
     e.preventDefault(); setErr('');
     const existing = rows.filter(r=>r.employee_id===f.employee_id);
     const ver = existing.length ? Math.max(...existing.map(r=>r.version))+1 : 1;
-    const { error } = await supabase.from('bonus_plans').insert({
+    const { error } = await fin.from('bonus_plans').insert({
       employee_id: f.employee_id, version: ver, metric: f.metric,
       target_a: Number(f.target_a), target_b: Number(f.target_b),
       pct_tier_1: Number(f.pct_tier_1), pct_tier_2: Number(f.pct_tier_2),
@@ -155,9 +155,9 @@ function Clawbacks() {
   const [err, setErr] = useState('');
   async function load() {
     const [p, c] = await Promise.all([
-      supabase.from('placements').select('id, ended_reason, status, expected_commission, applications(candidates(full_name))')
+      fin.from('placements').select('id, ended_reason, status, expected_commission, applications(candidates(full_name))')
         .in('status', ['left_in_warranty','not_started','cancelled']),
-      supabase.from('clawback_proposals').select('*, employees(full_name), placements(applications(candidates(full_name)))').order('created_at',{ascending:false}),
+      fin.from('clawback_proposals').select('*, employees(full_name), placements(applications(candidates(full_name)))').order('created_at',{ascending:false}),
     ]);
     if (!p.error) setFailed(p.data); if (!c.error) setProps(c.data);
   }

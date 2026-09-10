@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, fin } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { PLACEMENT_STATUS, INVOICE_STATUS, COMMISSION_BASE, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
@@ -14,15 +14,15 @@ export default function PlacementDetail() {
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
 
   async function load() {
-    const r = await supabase.from('placements')
+    const r = await fin.from('placements')
       .select('*, companies(name), applications(candidates(full_name), jobs(title))')
       .eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('ההשמה לא נמצאה'); return; }
     setP(r.data);
-    const sched = await supabase.from('payment_schedules').select('id').eq('placement_id', id).maybeSingle();
+    const sched = await fin.from('payment_schedules').select('id').eq('placement_id', id).maybeSingle();
     if (sched.data) {
-      const inv = await supabase.from('invoices').select('*').eq('schedule_id', sched.data.id).order('seq');
+      const inv = await fin.from('invoices').select('*').eq('schedule_id', sched.data.id).order('seq');
       if (!inv.error) setInvoices(inv.data);
     } else setInvoices([]);
   }

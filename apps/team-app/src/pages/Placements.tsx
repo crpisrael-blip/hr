@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { fin } from '../lib/supabase';
 import { PLACEMENT_STATUS, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
 
@@ -8,7 +8,7 @@ export default function Placements() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
-    supabase.from('placements')
+    fin.from('placements')
       .select('id, status, agreed_salary, expected_commission, currency, verified_start_date, warranty_ends_on, companies(name), applications(candidates(full_name))')
       .order('created_at', { ascending: false }).limit(200)
       .then(r => { if (r.error) setErr(r.error.message); else setRows(r.data as any); });

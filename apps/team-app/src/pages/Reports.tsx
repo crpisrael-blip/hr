@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fin as financeDb } from '../lib/supabase';
 import { APP_STAGE, money } from '../lib/format';
 import PageHead from '../components/PageHead';
 
@@ -16,7 +16,7 @@ export default function Reports() {
       (apps.data as any[]).forEach(a => { counts[a.stage] = (counts[a.stage] ?? 0) + 1; });
       setStages(counts);
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-      const pl = await supabase.from('placements').select('expected_commission, created_at').gte('created_at', monthStart.toISOString());
+      const pl = await financeDb.from('placements').select('expected_commission, created_at').gte('created_at', monthStart.toISOString());
       if (!pl.error) {
         const rows = pl.data as any[];
         setFin({ placements: rows.length, commission: rows.reduce((s, r) => s + Number(r.expected_commission || 0), 0) });

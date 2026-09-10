@@ -16,3 +16,6 @@ export const supabase = createClient(url, anon, {
 
 // לקוח לסכמת ברירת המחדל, לקריאות שאינן app (אם יידרש).
 export const supabasePublic = createClient(url, anon);
+
+// גישה לטבלאות בסכמת finance (השמות, חיובים, בונוסים) — משתף את אותו session.
+export const fin = supabase.schema('finance');
