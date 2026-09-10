@@ -26,7 +26,7 @@ export default function JobDetail() {
 
   async function load() {
     const r = await supabase.from('jobs')
-      .select('id, title, stage, location, employment_scope, headcount, salary_min, salary_max, opened_at, closed_at, internal_description, must_have, nice_to_have, custom, company_id, recruiter_id, companies(name), employees:recruiter_id(full_name), job_publications(id, status)')
+      .select('id, title, stage, location, employment_scope, headcount, salary_min, salary_max, opened_at, closed_at, internal_description, must_have, nice_to_have, custom, company_id, recruiter_id, companies(name), employees!recruiter_id(full_name), job_publications(id, status)')
       .eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('המשרה לא נמצאה'); return; }
@@ -34,7 +34,7 @@ export default function JobDetail() {
     setPub((r.data as any).job_publications?.find((p: any) => p.status === 'published') ?? null);
     const [ap, lg] = await Promise.all([
       supabase.from('applications').select('id, stage, stage_changed_at, candidates(full_name)').eq('job_id', id).order('stage_changed_at', { ascending: false }),
-      supabase.from('job_stage_history').select('*, employees:changed_by(full_name)').eq('job_id', id).order('changed_at', { ascending: false }),
+      supabase.from('job_stage_history').select('*, employees!changed_by(full_name)').eq('job_id', id).order('changed_at', { ascending: false }),
     ]);
     if (!ap.error) setApps(ap.data); if (!lg.error) setLog(lg.data);
   }
