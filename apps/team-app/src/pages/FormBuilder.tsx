@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { RECIPIENTS, FILING_TARGETS, MAPPABLE, FORM_CATEGORIES } from '../lib/entities';
 import PageHead from '../components/PageHead';
 
 const TYPES: [string, string][] = [
@@ -8,9 +9,6 @@ const TYPES: [string, string][] = [
   ['boolean','כן/לא'], ['select','בחירה יחידה'], ['multiselect','בחירה מרובה'], ['list','רשימה'],
   ['heading','כותרת'], ['paragraph','הסבר'], ['signature','חתימה'],
 ];
-const RECIPIENT: [string,string][] = [['candidate','מועמד'],['staff','מגייס/עובד'],['client','לקוח'],['general','כללי']];
-const FILING: [string,string][] = [['candidate','תיק מועמד'],['employee','תיק עובד'],['company','תיק לקוח'],['application','מועמדות'],['placement','השמה'],['general','מאגר כללי']];
-const MAP_TABLES: [string,string][] = [['candidates','מועמד'],['employees','עובד'],['companies','לקוח']];
 const hasOptions = (t: string) => t === 'select' || t === 'multiselect';
 
 type Field = { key: string; type: string; label: string; help?: string; required?: boolean; options?: {value:string;label:string}[]; show_if?: {field:string;equals:string} };
@@ -80,12 +78,14 @@ export default function FormBuilder() {
         <h2 className="sec">הגדרות הטופס</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <label><span className="lbl">שם הטופס *</span><input value={name} onChange={e => setName(e.target.value)} /></label>
-          <label><span className="lbl">מיועד ל־</span><select value={recipient} onChange={e => setRecipient(e.target.value)}>{RECIPIENT.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+          <label><span className="lbl">מיועד ל־</span><select value={recipient} onChange={e => setRecipient(e.target.value)}>{RECIPIENTS.map(r=><option key={r.key} value={r.key}>{r.label}</option>)}</select></label>
         </div>
         <label><span className="lbl">תיאור / הנחיה לנמען</span><input value={description} onChange={e => setDescription(e.target.value)} /></label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-          <label><span className="lbl">יעד תיוק</span><select value={filingTarget} onChange={e => setFilingTarget(e.target.value)}>{FILING.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
-          <label><span className="lbl">קטגוריית תיוק</span><input value={filingCategory} onChange={e => setFilingCategory(e.target.value)} placeholder="קליטה / ראיון / אישורים…" /></label>
+          <label><span className="lbl">יעד תיוק</span><select value={filingTarget} onChange={e => setFilingTarget(e.target.value)}>{FILING_TARGETS.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select></label>
+          <label><span className="lbl">קטגוריית תיוק</span>
+            <input list="form-categories" value={filingCategory} onChange={e => setFilingCategory(e.target.value)} placeholder="קליטה / ראיון / אישורים…" />
+            <datalist id="form-categories">{FORM_CATEGORIES.map(c=><option key={c} value={c} />)}</datalist></label>
           <label><span className="lbl">סטטוס</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="draft">טיוטה</option><option value="active">פעיל</option><option value="archived">בארכיון</option></select></label>
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function FormBuilder() {
                   <option value="">שדה בטופס…</option>
                   {fields.filter(f => !['heading','paragraph'].includes(f.type)).map(f => <option key={f.key} value={f.key}>{f.label || f.key}</option>)}
                 </select>
-                <select value={m.table} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, table: e.target.value } : x))}>{MAP_TABLES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
+                <select value={m.table} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, table: e.target.value } : x))}>{MAPPABLE.map(en=><option key={en.table} value={en.table}>{en.label}</option>)}</select>
                 <input placeholder="עמודה (phone_raw)" value={m.column} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, column: e.target.value } : x))} dir="ltr" />
                 <select value={m.mode} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, mode: e.target.value as any } : x))}><option value="approve">לאישור</option><option value="auto">אוטומטי</option></select>
                 <button className="btn btn-quiet btn-sm" onClick={() => setMaps(a => a.filter((_, n) => n !== i))}>🗑</button>

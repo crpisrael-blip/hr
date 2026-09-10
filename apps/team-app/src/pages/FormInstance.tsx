@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDate } from '../lib/format';
 import { FORM_BASE } from './Forms';
+import { tableForEntity } from '../lib/entities';
 import PageHead from '../components/PageHead';
 
 const FSTATUS: [string,string][] = [['created','נוצר'],['sent','נשלח'],['opened','נפתח'],['started','התחיל מילוי'],['completed','הושלם']];
@@ -28,7 +29,7 @@ export default function FormInstance() {
   const fields = (t.definition?.fields ?? []).slice().sort((a:any,b:any)=>(a.order??0)-(b.order??0));
   const answers = i.answers ?? {};
   const link = `${FORM_BASE}/f/${i.token}`;
-  const tblFor = (e: string) => e === 'candidate' ? 'candidates' : e === 'employee' ? 'employees' : e === 'company' ? 'companies' : null;
+  const tblFor = (e: string) => tableForEntity(e);
 
   async function markSent() { await supabase.from('form_instances').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id); load(); }
 

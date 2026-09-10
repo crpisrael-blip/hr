@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDate } from '../lib/format';
+import { RECIPIENT_LABEL as RECIPIENT, LINKABLE, entityByKey } from '../lib/entities';
 import PageHead from '../components/PageHead';
 
 export const FORM_BASE = 'https://my.hr.ort-tech.co.il';
-const RECIPIENT: Record<string,string> = { candidate:'מועמד', staff:'מגייס/עובד', client:'לקוח', general:'כללי' };
 const FSTATUS: Record<string,string> = { created:'נוצר', sent:'נשלח', opened:'נפתח', started:'במילוי', completed:'הושלם' };
 const TSTATUS: Record<string,string> = { draft:'טיוטה', active:'פעיל', archived:'ארכיון' };
 
@@ -89,10 +89,10 @@ function SendPanel({ template, onDone }: { template: any; onDone: () => void }) 
   const [link, setLink] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (!entityType) { setEntities([]); return; }
-    const tbl = entityType === 'candidate' ? 'candidates' : entityType === 'employee' ? 'employees' : 'companies';
-    const col = entityType === 'company' ? 'name' : 'full_name';
-    supabase.from(tbl).select(`id, ${col}`).order(col).limit(500).then(r => { if (!r.error) setEntities(r.data.map((x:any)=>({ id:x.id, name:x[col] }))); });
+    const en = entityByKey(entityType);
+    if (!en || !en.nameCol) { setEntities([]); return; }
+    const col = en.nameCol;
+    supabase.from(en.table).select(`id, ${col}`).order(col).limit(500).then(r => { if (!r.error) setEntities(r.data.map((x:any)=>({ id:x.id, name:x[col] }))); });
   }, [entityType]);
 
   async function create() {
@@ -120,7 +120,7 @@ function SendPanel({ template, onDone }: { template: any; onDone: () => void }) 
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:10 }}>
           <label><span className="lbl">קישור לתיק</span><select value={entityType} onChange={e=>{setEntityType(e.target.value);setEntityId('');}}>
-            <option value="">ללא</option><option value="candidate">מועמד</option><option value="employee">עובד</option><option value="company">לקוח</option></select></label>
+            <option value="">ללא</option>{LINKABLE.map(en=><option key={en.key} value={en.key}>{en.label}</option>)}</select></label>
           {entityType && <label><span className="lbl">בחר/י</span><select value={entityId} onChange={e=>setEntityId(e.target.value)}>
             <option value="">—</option>{entities.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
         </div>
