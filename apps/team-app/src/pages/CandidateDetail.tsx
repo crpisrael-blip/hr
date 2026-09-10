@@ -64,8 +64,8 @@ export default function CandidateDetail() {
         <div className="card" style={{ padding: 20 }}>
           <h2 className="sec">פרטים</h2>
           <dl className="dl">
-            <dt>טלפון</dt><dd>{c.phone_raw ?? '—'}</dd>
-            <dt>דוא״ל</dt><dd>{c.email ?? '—'}</dd>
+            <dt>טלפון</dt><dd>{c.phone_raw ? <bdi dir="ltr">{c.phone_raw}</bdi> : '—'}</dd>
+            <dt>דוא״ל</dt><dd>{c.email ? <bdi dir="ltr">{c.email}</bdi> : '—'}</dd>
             <dt>כישורים</dt><dd>{c.skills?.length ? c.skills.join(', ') : '—'}</dd>
             <dt>שכר רצוי</dt><dd>{money(c.desired_salary)}</dd>
             <dt>זמינות</dt><dd>{c.availability ?? '—'}</dd>

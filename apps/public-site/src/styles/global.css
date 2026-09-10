@@ -22,6 +22,8 @@
   --accent-soft: #eaf3fe;
   --accent-ink:  #08103a;
 
+  --danger:      #c0392b;
+
   --focus: #2f6fed;
 
   --radius:    10px;
@@ -135,9 +137,10 @@ select, textarea, input[type="file"] {
   border-radius: var(--radius-sm);
 }
 textarea { min-height: 110px; resize: vertical; }
-input:invalid[data-touched] { border-color: var(--accent); }
+input:invalid[data-touched] { border-color: var(--danger); }
 
-.error-text { color: var(--accent); font-size: .87rem; font-weight: 600; }
+.error-text { color: var(--danger); font-size: .87rem; font-weight: 600; }
+.error-text::before { content: "⚠ "; }
 
 /* ---------- תגיות ---------- */
 .tag {

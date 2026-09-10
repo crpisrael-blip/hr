@@ -29,7 +29,8 @@ export default function Tasks() {
   useEffect(() => { load(); }, [scope]);
 
   async function move(taskId: string, status: string) {
-    await supabase.from('tasks').update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('id', taskId);
+    const { error } = await supabase.from('tasks').update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('id', taskId);
+    if (error) setErr('עדכון המשימה נכשל: ' + error.message);
     load();
   }
 

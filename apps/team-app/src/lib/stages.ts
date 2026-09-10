@@ -27,10 +27,6 @@ export function allowedTransitions(current: string): { to: Stage; label: string;
     const next = WORK_ORDER[i + 1];
     out.push({ to: next, label: `קידום ל"${APP_STAGE[next]}"`, kind: 'advance' });
   }
-  // ראיון נוסף
-  if (current === 'interview') {
-    out.push({ to: 'offer', label: `קידום ל"${APP_STAGE.offer}"`, kind: 'advance' });
-  }
   // סגירה, מכל שלב עבודה שאינו התקבל
   if (current !== 'hired') {
     out.push({ to: 'rejected', label: 'נדחה', kind: 'close' });

@@ -50,7 +50,7 @@ export default function CompanyDetail() {
         <div className="card" style={{ overflowX: 'auto' }}>
           {jobs.length===0 ? <p className="empty">אין משרות לחברה זו.</p> : (
             <table><thead><tr><th>תפקיד</th><th>שלב</th></tr></thead><tbody>
-              {jobs.map(j=><tr key={j.id}><td style={{fontWeight:600}}><Link to={`/jobs`}>{j.title}</Link></td><td><span className="tag mute">{JOB_STAGE[j.stage]}</span></td></tr>)}
+              {jobs.map(j=><tr key={j.id}><td style={{fontWeight:600}}><Link to={`/jobs/${j.id}`}>{j.title}</Link></td><td><span className="tag mute">{JOB_STAGE[j.stage]}</span></td></tr>)}
             </tbody></table>
           )}
         </div>
@@ -87,7 +87,7 @@ function ContactsTab({ companyId, rows, onChange }: { companyId: string; rows: a
       {err && <p className="msg err" style={{ margin: 12 }}>{err}</p>}
       {rows.length>0 && (
         <table><thead><tr><th>שם</th><th>תפקיד</th><th>דוא״ל</th><th>טלפון</th></tr></thead><tbody>
-          {rows.map(c=><tr key={c.id}><td style={{fontWeight:600}}>{c.full_name}{c.is_primary && <span className="tag brand" style={{marginRight:6}}>ראשי</span>}</td><td>{c.title??'—'}</td><td>{c.email??'—'}</td><td>{c.phone??'—'}</td></tr>)}
+          {rows.map(c=><tr key={c.id}><td style={{fontWeight:600}}>{c.full_name}{c.is_primary && <span className="tag brand" style={{marginInlineStart:6}}>ראשי</span>}</td><td>{c.title??'—'}</td><td>{c.email? <bdi dir="ltr">{c.email}</bdi> :'—'}</td><td>{c.phone? <bdi dir="ltr">{c.phone}</bdi> :'—'}</td></tr>)}
         </tbody></table>
       )}
     </div>

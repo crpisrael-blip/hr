@@ -26,9 +26,9 @@ export default function Settings() {
   }
   useEffect(() => { load(); }, []);
 
-  async function setRole(id: string, role: string) { await supabase.from('employees').update({ role }).eq('id', id); load(); }
-  async function setStatus(id: string, employment_status: string) { await supabase.from('employees').update({ employment_status }).eq('id', id); load(); }
-  async function saveStage(stage: string, patch: any) { await supabase.from('stage_exposure').update(patch).eq('stage', stage); load(); }
+  async function setRole(id: string, role: string) { const { error } = await supabase.from('employees').update({ role }).eq('id', id); if (error) setErr(error.message); else load(); }
+  async function setStatus(id: string, employment_status: string) { const { error } = await supabase.from('employees').update({ employment_status }).eq('id', id); if (error) setErr(error.message); else load(); }
+  async function saveStage(stage: string, patch: any) { const { error } = await supabase.from('stage_exposure').update(patch).eq('stage', stage); if (error) setErr(error.message); else load(); }
 
   if (!isMgr) return <><PageHead title="הגדרות" /><p className="msg err">רק מנהלת המערכת רשאית לגשת להגדרות.</p></>;
 

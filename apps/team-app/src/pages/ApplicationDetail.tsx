@@ -59,8 +59,9 @@ export default function ApplicationDetail() {
       stage: to, stage_changed_at: new Date().toISOString(), close_reason: kind === 'close' ? reason : null,
     }).eq('id', a.id);
     if (up.error) { setErr(up.error.message); setBusy(false); return; }
-    await supabase.from('application_stage_history').insert({
+    const hist = await supabase.from('application_stage_history').insert({
       application_id: a.id, from_stage: from, to_stage: to, reason, changed_by: emp });
+    if (hist.error) setErr('השלב עודכן אך רישום ההיסטוריה נכשל: ' + hist.error.message);
     await load(); setBusy(false);
   }
 
@@ -139,12 +140,14 @@ export default function ApplicationDetail() {
 
 function Interviews({ appId, rows, onChange }: { appId: string; rows: any[]; onChange: () => void }) {
   const [open, setOpen] = useState(false);
-  const [when, setWhen] = useState(''); const [loc, setLoc] = useState(''); const [busy, setBusy] = useState(false);
+  const [when, setWhen] = useState(''); const [loc, setLoc] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   async function add(e: FormEvent) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault(); setBusy(true); setErr('');
     const emp = await myEmployeeId();
-    await supabase.from('interviews').insert({ application_id: appId, scheduled_at: new Date(when).toISOString(), location: loc || null, created_by: emp });
-    setBusy(false); setOpen(false); setWhen(''); setLoc(''); onChange();
+    const { error } = await supabase.from('interviews').insert({ application_id: appId, scheduled_at: new Date(when).toISOString(), location: loc || null, created_by: emp });
+    setBusy(false);
+    if (error) { setErr('שמירת הראיון נכשלה: ' + error.message); return; }
+    setOpen(false); setWhen(''); setLoc(''); onChange();
   }
   return (
     <div className="card" style={{ padding: 20 }}>
@@ -159,6 +162,7 @@ function Interviews({ appId, rows, onChange }: { appId: string; rows: any[]; onC
         <form onSubmit={add} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           <input type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} required />
           <input placeholder="מיקום / קישור (רשות)" value={loc} onChange={e => setLoc(e.target.value)} />
+          {err && <p className="msg err">{err}</p>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" disabled={busy || !when}>שמירה</button>
             <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>ביטול</button>
@@ -171,14 +175,16 @@ function Interviews({ appId, rows, onChange }: { appId: string; rows: any[]; onC
 
 function Submissions({ appId, rows, contacts, onChange }: { appId: string; rows: any[]; contacts: any[]; onChange: () => void }) {
   const [open, setOpen] = useState(false);
-  const [contactId, setContactId] = useState(''); const [summary, setSummary] = useState(''); const [busy, setBusy] = useState(false);
+  const [contactId, setContactId] = useState(''); const [summary, setSummary] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   async function add(e: FormEvent) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault(); setBusy(true); setErr('');
     const emp = await myEmployeeId();
-    await supabase.from('client_submissions').insert({
+    const { error } = await supabase.from('client_submissions').insert({
       application_id: appId, contact_id: contactId || null, summary_sent: summary || null,
       channel: 'email', sent_manually: true, sent_at: new Date().toISOString(), created_by: emp });
-    setBusy(false); setOpen(false); setSummary(''); onChange();
+    setBusy(false);
+    if (error) { setErr('שמירת ההגשה נכשלה: ' + error.message); return; }
+    setOpen(false); setSummary(''); onChange();
   }
   return (
     <div className="card" style={{ padding: 20 }}>
@@ -196,6 +202,7 @@ function Submissions({ appId, rows, contacts, onChange }: { appId: string; rows:
             {contacts.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
           </select>
           <textarea placeholder="תקציר שנשלח (רשות)" value={summary} onChange={e => setSummary(e.target.value)} />
+          {err && <p className="msg err">{err}</p>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" disabled={busy}>שמירת הגשה</button>
             <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>ביטול</button>

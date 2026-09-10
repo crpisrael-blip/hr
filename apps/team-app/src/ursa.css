@@ -40,8 +40,8 @@ body { font-size:16px; background:#f0f9fd; }
 .topbar { height:76px; display:flex; align-items:center; gap:22px; padding:16px 28px; }
 .search { position:relative; flex:1; max-width:530px; }
 .search input { height:42px; min-height:42px; border:0; border-radius:12px; padding:8px 40px; background:#ffffffc9; font-size:14px; box-shadow:none; }
-.search .s-ic { position:absolute; top:12px; left:12px; color:#729cc4; z-index:1; }
-.search kbd { position:absolute; right:10px; top:9px; background:#edf6fc; color:#6484a9; border-radius:5px; padding:1px 6px; font-size:13px; direction:ltr; }
+.search .s-ic { position:absolute; top:12px; inset-inline-start:12px; color:#729cc4; z-index:1; }
+.search kbd { position:absolute; inset-inline-end:10px; top:9px; background:#edf6fc; color:#6484a9; border-radius:5px; padding:1px 6px; font-size:13px; direction:ltr; }
 .bell { border:0; background:transparent; color:#08528e; display:grid; place-items:center; padding:0; width:28px; height:36px; flex-shrink:0; cursor:pointer; }
 .topbar .ava { width:44px; height:44px; background:#b5d8f5; color:#075494; }
 .content { padding:22px 28px; min-width:0; }

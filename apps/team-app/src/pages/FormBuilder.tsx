@@ -62,7 +62,10 @@ export default function FormBuilder() {
       is_site_apply: siteApply,
     };
     // רק תבנית אחת יכולה לשמש כטופס ההגשה באתר — מכבים אחרות לפני השמירה.
-    if (siteApply) await supabase.from('form_templates').update({ is_site_apply: false }).eq('is_site_apply', true);
+    if (siteApply) {
+      const clr = await supabase.from('form_templates').update({ is_site_apply: false }).eq('is_site_apply', true);
+      if (clr.error) { setErr('כשל בכיבוי טופס ההגשה הקודם: ' + clr.error.message); setBusy(false); return; }
+    }
     const res = editing
       ? await supabase.from('form_templates').update(body).eq('id', id).select('id').single()
       : await supabase.from('form_templates').insert(body).select('id').single();

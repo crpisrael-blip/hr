@@ -27,8 +27,10 @@ export default function TaskDetail() {
 
   async function markMine(status: string) {
     if (!meId) return;
-    await supabase.from('task_assignees').update({ personal_status: status, done_at: status==='done'?new Date().toISOString():null })
+    setErr('');
+    const mine = await supabase.from('task_assignees').update({ personal_status: status, done_at: status==='done'?new Date().toISOString():null })
       .eq('task_id', id).eq('employee_id', meId);
+    if (mine.error) { setErr('עדכון הסטטוס נכשל: ' + mine.error.message); return; }
     // עדכון סטטוס המשימה לפי כלל ההשלמה
     const { data: rows } = await supabase.from('task_assignees').select('personal_status').eq('task_id', id);
     const active = (rows ?? []).filter((r:any)=>r.personal_status!=='removed');
@@ -38,12 +40,17 @@ export default function TaskDetail() {
     if (rule === 'any_assignee' && done.length >= 1) newStatus = 'done';
     else if (rule === 'all_assignees' && active.length > 0 && done.length === active.length) newStatus = 'done';
     else if (done.length > 0) newStatus = 'in_progress';
-    if (newStatus !== t.status) await supabase.from('tasks').update({ status: newStatus, completed_at: newStatus==='done'?new Date().toISOString():null }).eq('id', id);
+    if (newStatus !== t.status) {
+      const up = await supabase.from('tasks').update({ status: newStatus, completed_at: newStatus==='done'?new Date().toISOString():null }).eq('id', id);
+      if (up.error) { setErr('עדכון סטטוס המשימה נכשל: ' + up.error.message); return; }
+    }
     load();
   }
   async function cancel() {
     const reason = prompt('סיבת ביטול:'); if (!reason) return;
-    await supabase.from('tasks').update({ status: 'cancelled', cancel_reason: reason }).eq('id', id); nav('/tasks');
+    const { error } = await supabase.from('tasks').update({ status: 'cancelled', cancel_reason: reason }).eq('id', id);
+    if (error) { setErr('ביטול המשימה נכשל: ' + error.message); return; }
+    nav('/tasks');
   }
 
   if (err) return <p className="msg err">{err}</p>;

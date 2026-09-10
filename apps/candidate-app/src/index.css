@@ -65,6 +65,10 @@ body {
 /* ---------- pages ---------- */
 .page { display: flex; flex-direction: column; gap: 14px; animation: rise .28s ease; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* כיבוד העדפת תנועה מופחתת (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
 .page-title { font-family: var(--disp); font-size: 1.5rem; margin: 8px 2px 0; color: var(--navy); }
 .card-h { font-size: 1.05rem; margin: 0 0 10px; color: var(--navy); }
 .stack { display: flex; flex-direction: column; gap: 12px; }
@@ -132,7 +136,10 @@ input, select, textarea {
   font-family: inherit; font-size: 1rem; color: var(--ink);
   background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-sm);
   padding: 11px 13px; width: 100%; transition: border-color .15s, background .15s; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--sky); background: #fff; }
+input:focus, select:focus, textarea:focus { border-color: var(--navy); background: #fff; }
+/* מחוון פוקוס נגיש למקלדת בכל האלמנטים האינטראקטיביים (WCAG 2.4.7). */
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; }
 input:disabled, select:disabled { background: #f2f4f9; color: var(--ink-soft); cursor: not-allowed; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px;

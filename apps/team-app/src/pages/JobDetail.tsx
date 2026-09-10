@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { JOB_STAGE, APP_STAGE, formatDate } from '../lib/format';
+import { JOB_STAGE, APP_STAGE, formatDate, money } from '../lib/format';
 import PageHead from '../components/PageHead';
 import { CustomFieldsView } from '../components/CustomFields';
 
 const SCOPE: Record<string, string> = { full_time: 'מלאה', part_time: 'חלקית', temporary: 'זמני', contract: 'חוזה', student: 'סטודנט' };
-const money = (n: number | null) => n == null ? '—' : '₪' + Number(n).toLocaleString('he-IL');
 // מעברי סטטוס מותרים לפי הסטטוס הנוכחי.
 const NEXT: Record<string, { to: string; label: string; primary?: boolean }[]> = {
   draft:   [{ to: 'open', label: 'פתיחת המשרה', primary: true }, { to: 'closed', label: 'סגירה' }],

@@ -42,7 +42,7 @@ export default function Dashboard() {
         .order('due_at', { ascending: true, nullsFirst: false }).limit(5)
         .then(r => { if (!r.error) setTasks(r.data as any); });
       supabase.from('interviews').select('id, scheduled_at, applications(candidates(full_name), jobs(title))')
-        .gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5)
+        .gte('scheduled_at', new Date().toISOString()).neq('status', 'cancelled').order('scheduled_at').limit(5)
         .then(r => { if (!r.error) setSchedule(r.data as any); });
     })();
   }, []);
