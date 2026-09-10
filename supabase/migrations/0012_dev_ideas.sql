@@ -21,7 +21,7 @@ create table if not exists app.dev_ideas (
   body        text not null,
   context     text,                         -- המסך/ההקשר שממנו נלכד
   status      text not null default 'open'
-              check (status in ('open','done')),
+              check (status in ('open','in_progress','done')),
   created_at  timestamptz not null default now()
 );
 create index if not exists dev_ideas_user_created on app.dev_ideas (user_id, created_at desc);
