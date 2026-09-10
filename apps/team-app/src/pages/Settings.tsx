@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { APP_STAGE } from '../lib/format';
 import PageHead from '../components/PageHead';
+import CustomFieldsAdmin from '../components/CustomFieldsAdmin';
 
 const ROLE: Record<string,string> = { recruiter:'מגייס', manager:'מנהלת החברה', superadmin:'מנהל על' };
 const EMP_STATUS: Record<string,string> = { active:'פעיל', suspended:'מושבת', ended:'סיים' };
@@ -10,7 +11,7 @@ const EMP_STATUS: Record<string,string> = { active:'פעיל', suspended:'מוש
 export default function Settings() {
   const { employee } = useAuth();
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
-  const [tab, setTab] = useState<'users'|'stages'>('users');
+  const [tab, setTab] = useState<'users'|'stages'|'fields'>('users');
   const [emps, setEmps] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const [err, setErr] = useState('');
@@ -38,7 +39,10 @@ export default function Settings() {
       <div className="tabs">
         <button className={tab==='users'?'on':''} onClick={()=>setTab('users')}>משתמשים והרשאות</button>
         <button className={tab==='stages'?'on':''} onClick={()=>setTab('stages')}>חשיפת שלבים למועמד</button>
+        <button className={tab==='fields'?'on':''} onClick={()=>setTab('fields')}>שדות מותאמים</button>
       </div>
+
+      {tab==='fields' && <CustomFieldsAdmin />}
 
       {tab==='users' && (
         <div className="card" style={{ overflowX: 'auto' }}>

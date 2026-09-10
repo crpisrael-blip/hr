@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import PageHead from '../components/PageHead';
+import { CustomFieldsEdit } from '../components/CustomFields';
 
 // נרמול טלפון ישראלי לפורמט אחיד, מפתח הכפילות (אפיון, 0.2).
 function normalizePhone(raw: string): string | null {
@@ -18,13 +19,14 @@ export default function CandidateNew() {
   const { id } = useParams();
   const editing = !!id;
   const [f, setF] = useState({ full_name: '', phone: '', email: '', source: 'ידני', skills: '', desired_salary: '' });
+  const [custom, setCustom] = useState<Record<string, any>>({});
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: string) => setF(s => ({ ...s, [k]: v }));
 
   useEffect(() => {
     if (!editing) return;
-    supabase.from('candidates').select('full_name, phone_raw, email, source, skills, desired_salary').eq('id', id).maybeSingle()
+    supabase.from('candidates').select('full_name, phone_raw, email, source, skills, desired_salary, custom').eq('id', id).maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) { setErr('המועמד לא נמצא'); return; }
         setF({
@@ -32,6 +34,7 @@ export default function CandidateNew() {
           source: data.source ?? '', skills: (data.skills ?? []).join(', '),
           desired_salary: data.desired_salary != null ? String(data.desired_salary) : '',
         });
+        setCustom(data.custom ?? {});
       });
   }, [id, editing]);
 
@@ -46,6 +49,7 @@ export default function CandidateNew() {
       source: f.source.trim() || null,
       skills: f.skills ? f.skills.split(',').map(s => s.trim()).filter(Boolean) : null,
       desired_salary: f.desired_salary ? Number(f.desired_salary) : null,
+      custom,
     };
     const res = editing
       ? await supabase.from('candidates').update(body).eq('id', id).select('id').single()
@@ -79,6 +83,7 @@ export default function CandidateNew() {
           <label><span className="lbl">מקור</span>
             <input value={f.source} onChange={e => set('source', e.target.value)} /></label>
         </div>
+        <CustomFieldsEdit entityType="candidate" values={custom} onChange={setCustom} />
         {err && <p className="msg err">{err}</p>}
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-primary" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button>

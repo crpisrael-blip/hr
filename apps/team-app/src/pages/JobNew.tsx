@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import PageHead from '../components/PageHead';
+import { CustomFieldsEdit } from '../components/CustomFields';
 
 interface Company { id: string; name: string; }
 
@@ -14,6 +15,7 @@ export default function JobNew() {
     company_id: '', title: '', internal_description: '', location: '',
     employment_scope: 'full_time', headcount: 1, salary_min: '', salary_max: '',
   });
+  const [custom, setCustom] = useState<Record<string, any>>({});
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -24,7 +26,7 @@ export default function JobNew() {
 
   useEffect(() => {
     if (!editing) return;
-    supabase.from('jobs').select('company_id, title, internal_description, location, employment_scope, headcount, salary_min, salary_max')
+    supabase.from('jobs').select('company_id, title, internal_description, location, employment_scope, headcount, salary_min, salary_max, custom')
       .eq('id', id).maybeSingle().then(({ data, error }) => {
         if (error || !data) { setErr('המשרה לא נמצאה'); return; }
         setForm({
@@ -34,6 +36,7 @@ export default function JobNew() {
           salary_min: data.salary_min != null ? String(data.salary_min) : '',
           salary_max: data.salary_max != null ? String(data.salary_max) : '',
         });
+        setCustom(data.custom ?? {});
       });
   }, [id, editing]);
 
@@ -48,6 +51,7 @@ export default function JobNew() {
       headcount: Number(form.headcount) || 1,
       salary_min: form.salary_min ? Number(form.salary_min) : null,
       salary_max: form.salary_max ? Number(form.salary_max) : null,
+      custom,
     };
     if (!editing) body.stage = 'draft';
     const { error } = editing
@@ -89,6 +93,7 @@ export default function JobNew() {
           <label><span className="lbl">שכר עד</span>
             <input type="number" min={0} value={form.salary_max} onChange={e => set('salary_max', e.target.value)} /></label>
         </div>
+        <CustomFieldsEdit entityType="job" values={custom} onChange={setCustom} />
         {err && <p className="msg err">{err}</p>}
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-primary" disabled={busy || !form.company_id}>{busy ? 'שומר…' : 'שמירה'}</button>

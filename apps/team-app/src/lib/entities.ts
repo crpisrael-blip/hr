@@ -15,12 +15,14 @@ export interface EntityType {
   mappable?: boolean;   // ניתן למפות אליו שדות (עדכון עמודות)
   linkable?: boolean;   // ניתן לבחור/לחפש בעת שליחה
   columns?: EntityColumn[]; // עמודות שמותר למפות אליהן תשובות מהטופס (עם תווית בעברית)
+  customFields?: boolean; // תומך בשדות מותאמים ללא קוד (custom_fields + עמודת custom)
 }
 
 // ★ להוספת סוג ישות חדש — מוסיפים כאן שורה אחת בלבד.
 // עמודות המיפוי (columns) תואמות לשמות העמודות בפועל במסד (schema app).
 export const ENTITIES: EntityType[] = [
-  { key: 'candidate',   label: 'מועמד',       table: 'candidates',  nameCol: 'full_name', recipient: 'candidate', filing: true, mappable: true, linkable: true,
+  { key: 'job',         label: 'משרה',         table: 'jobs',        nameCol: 'title',     customFields: true },
+  { key: 'candidate',   label: 'מועמד',       table: 'candidates',  nameCol: 'full_name', recipient: 'candidate', filing: true, mappable: true, linkable: true, customFields: true,
     columns: [
       { col: 'full_name',        label: 'שם מלא' },
       { col: 'phone_raw',        label: 'טלפון' },
@@ -39,14 +41,14 @@ export const ENTITIES: EntityType[] = [
       { col: 'job_title', label: 'תפקיד' },
       { col: 'notes',     label: 'הערות' },
     ] },
-  { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true,
+  { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true, customFields: true,
     columns: [
       { col: 'name',        label: 'שם החברה' },
       { col: 'business_id', label: 'ח״פ / עוסק' },
       { col: 'website',     label: 'אתר' },
       { col: 'notes',       label: 'הערות' },
     ] },
-  { key: 'application', label: 'מועמדות',      table: 'applications', nameCol: null,        filing: true },
+  { key: 'application', label: 'מועמדות',      table: 'applications', nameCol: null,        filing: true, customFields: true },
   { key: 'placement',   label: 'השמה',         table: 'placements',  nameCol: null,        filing: true },
 ];
 
@@ -68,6 +70,9 @@ export const FILING_TARGETS: { key: string; label: string }[] = [
 export const LINKABLE = ENTITIES.filter(e => e.linkable);
 // סוגים שאליהם ניתן למפות שדות.
 export const MAPPABLE = ENTITIES.filter(e => e.mappable);
+
+// סוגי ישות שתומכים בשדות מותאמים ללא קוד.
+export const CUSTOM_FIELD_ENTITIES = ENTITIES.filter(e => e.customFields);
 
 export const entityByKey = (k?: string | null) => ENTITIES.find(e => e.key === k) || null;
 export const tableForEntity = (k?: string | null) => entityByKey(k)?.table ?? null;

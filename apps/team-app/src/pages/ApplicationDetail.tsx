@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { APP_STAGE, formatDate } from '../lib/format';
 import { allowedTransitions, type Stage } from '../lib/stages';
 import PageHead from '../components/PageHead';
+import { CustomFieldsEdit, useCustomFields } from '../components/CustomFields';
 
 async function myEmployeeId(): Promise<string | null> {
   const uid = (await supabase.auth.getUser()).data.user?.id;
@@ -32,7 +33,7 @@ export default function ApplicationDetail() {
 
   async function load() {
     const r = await supabase.from('applications')
-      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, recruiter_id, candidates(full_name), jobs(title, company_id, companies(name))')
+      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, recruiter_id, custom, candidates(full_name), jobs(title, company_id, companies(name))')
       .eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('המועמדות לא נמצאה'); return; }
@@ -100,6 +101,7 @@ export default function ApplicationDetail() {
             <span className="hint" style={{ marginTop: 8 }}>המגייס האחראי כאן הוא ברירת המחדל לזכאות הבונוס בעת יצירת ההשמה, שם ניתן לאמת אותו.</span>
           </div>
 
+          <AppCustom key={a.id} appId={a.id} initial={a.custom ?? {}} onSaved={load} />
           <Interviews appId={a.id} rows={interviews} onChange={load} />
           <Submissions appId={a.id} rows={subs} contacts={contacts} onChange={load} />
         </div>
@@ -200,6 +202,29 @@ function Submissions({ appId, rows, contacts, onChange }: { appId: string; rows:
           </div>
         </form>
       ) : <button className="btn btn-quiet btn-sm addbtn" onClick={() => setOpen(true)}>+ תיעוד הגשה ללקוח</button>}
+    </div>
+  );
+}
+
+// שדות מותאמים למועמדות (תהליך גיוס) — עריכה ושמירה במקום.
+function AppCustom({ appId, initial, onSaved }: { appId: string; initial: Record<string, any>; onSaved: () => void }) {
+  const fields = useCustomFields('application');
+  const [vals, setVals] = useState<Record<string, any>>(initial);
+  const [busy, setBusy] = useState(false); const [note, setNote] = useState('');
+  if (!fields.length) return null;
+  async function save() {
+    setBusy(true); setNote('');
+    const { error } = await supabase.from('applications').update({ custom: vals }).eq('id', appId);
+    setBusy(false); setNote(error ? 'שמירה נכשלה' : 'נשמר');
+    if (!error) onSaved();
+  }
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <CustomFieldsEdit entityType="application" values={vals} onChange={setVals} />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button className="btn btn-quiet btn-sm" disabled={busy} onClick={save}>{busy ? 'שומר…' : 'שמירת שדות נוספים'}</button>
+        {note && <span className="hint">{note}</span>}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { COMPANY_STATUS, COMMISSION_BASE, JOB_STAGE, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
+import { CustomFieldsView } from '../components/CustomFields';
 
 type Tab = 'contacts' | 'agreements' | 'jobs';
 
@@ -36,6 +37,7 @@ export default function CompanyDetail() {
   return (
     <>
       <PageHead title={company.name} sub={COMPANY_STATUS[company.status]} />
+      <div style={{ marginBottom: 16 }}><CustomFieldsView entityType="company" values={company.custom} /></div>
       <div className="tabs">
         <button className={tab==='contacts'?'on':''} onClick={()=>setTab('contacts')}>אנשי קשר ({contacts.length})</button>
         <button className={tab==='agreements'?'on':''} onClick={()=>setTab('agreements')}>הסכמים ({agreements.length})</button>
@@ -45,7 +47,7 @@ export default function CompanyDetail() {
       {tab==='contacts' && <ContactsTab companyId={id!} rows={contacts} onChange={load} />}
       {tab==='agreements' && <AgreementsTab companyId={id!} rows={agreements} onChange={load} />}
       {tab==='jobs' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           {jobs.length===0 ? <p className="empty">אין משרות לחברה זו.</p> : (
             <table><thead><tr><th>תפקיד</th><th>שלב</th></tr></thead><tbody>
               {jobs.map(j=><tr key={j.id}><td style={{fontWeight:600}}><Link to={`/jobs`}>{j.title}</Link></td><td><span className="tag mute">{JOB_STAGE[j.stage]}</span></td></tr>)}

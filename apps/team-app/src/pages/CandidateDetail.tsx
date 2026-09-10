@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { APP_STAGE, formatDate, money } from '../lib/format';
 import PageHead from '../components/PageHead';
+import { CustomFieldsView } from '../components/CustomFields';
 
 interface Candidate {
   id: string; full_name: string; phone_raw: string | null; email: string | null;
   skills: string[] | null; desired_salary: number | null; availability: string | null; source: string | null; created_at: string;
+  custom?: Record<string, any> | null;
 }
 interface Appl { id: string; stage: string; stage_changed_at: string; jobs: { title: string } | null; }
 interface Doc { id: string; kind: string; file_name: string; storage_path: string; size_bytes: number; created_at: string; }
@@ -27,7 +29,7 @@ export default function CandidateDetail() {
   useEffect(() => {
     (async () => {
       const cr = await supabase.from('candidates')
-        .select('id, full_name, phone_raw, email, skills, desired_salary, availability, source, created_at')
+        .select('id, full_name, phone_raw, email, skills, desired_salary, availability, source, created_at, custom')
         .eq('id', id).maybeSingle();
       if (cr.error) { setErr(cr.error.message); return; }
       if (!cr.data) { setErr('המועמד לא נמצא'); return; }
@@ -87,6 +89,7 @@ export default function CandidateDetail() {
           )}
         </div>
       </div>
+      <div style={{ marginTop: 16 }}><CustomFieldsView entityType="candidate" values={c.custom} /></div>
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
         <h2 className="sec">מסמכים ({docs.length})</h2>
         {docs.length === 0 ? <p className="hint">אין מסמכים.</p> : (
