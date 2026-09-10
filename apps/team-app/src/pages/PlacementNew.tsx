@@ -13,18 +13,23 @@ export default function PlacementNew() {
   const [agreementId, setAgreementId] = useState('');
   const [salary, setSalary] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
+  const [emps, setEmps] = useState<any[]>([]);
+  const [recruiterId, setRecruiterId] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
       const a = await supabase.from('applications')
-        .select('id, candidates(full_name), jobs(title, company_id, companies(name))')
+        .select('id, recruiter_id, candidates(full_name), jobs(title, company_id, companies(name))')
         .eq('id', applicationId).maybeSingle();
       if (a.error || !a.data) { setErr('המועמדות לא נמצאה'); return; }
       setAppl(a.data);
+      setRecruiterId((a.data as any).recruiter_id ?? '');
       const companyId = (a.data as any).jobs?.company_id;
       const ag = await supabase.from('agreements').select('*').eq('company_id', companyId).order('version', { ascending: false });
       if (!ag.error) { setAgreements(ag.data); if (ag.data[0]) setAgreementId(ag.data[0].id); }
+      const em = await supabase.from('employees').select('id, full_name').eq('employment_status','active').order('full_name');
+      if (!em.error) setEmps(em.data);
     })();
   }, [applicationId]);
 
@@ -34,7 +39,15 @@ export default function PlacementNew() {
     : null;
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
+    e.preventDefault(); setErr('');
+    if (!recruiterId) { setErr('יש לבחור מגייס זכאי לבונוס.'); return; }
+    setBusy(true);
+    // נעילת המגייס הזכאי: create_placement יורש את recruiter_id מהמועמדות,
+    // לכן מעדכנים אותו במועמדות אם שונה לפני יצירת ההשמה.
+    if (recruiterId !== appl.recruiter_id) {
+      const up = await supabase.from('applications').update({ recruiter_id: recruiterId }).eq('id', applicationId);
+      if (up.error) { setErr(up.error.message); setBusy(false); return; }
+    }
     const { data, error } = await supabase.rpc('create_placement', {
       p_application_id: applicationId, p_agreement_id: agreementId,
       p_agreed_salary: Number(salary), p_expected_start: startDate,
@@ -61,10 +74,16 @@ export default function PlacementNew() {
           <input type="number" value={salary} onChange={e=>setSalary(e.target.value)} required placeholder="למשל 15000" /></label>
         <label><span className="lbl">תאריך תחילת עבודה צפוי</span>
           <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} /></label>
+        <label><span className="lbl">מגייס זכאי לבונוס *</span>
+          <select value={recruiterId} onChange={e=>setRecruiterId(e.target.value)} required>
+            <option value="">בחרו מגייס…</option>
+            {emps.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+          </select>
+          <span className="hint">הבונוס על השמה זו ייזקף למגייס שנבחר כאן, וייעל בהשמה. ברירת המחדל היא המגייס האחראי במועמדות.</span></label>
         {preview != null && <p className="msg ok">עמלה צפויה: {money(preview)}</p>}
         {err && <p className="msg err">{err}</p>}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-primary" disabled={busy || !agreementId || !salary}>{busy ? 'יוצר…' : 'יצירת השמה'}</button>
+          <button className="btn btn-primary" disabled={busy || !agreementId || !salary || !recruiterId}>{busy ? 'יוצר…' : 'יצירת השמה'}</button>
           <button type="button" className="btn btn-quiet" onClick={()=>nav(-1)}>ביטול</button>
         </div>
       </form>

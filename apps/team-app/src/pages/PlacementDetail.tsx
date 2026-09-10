@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase, fin, enrichPlacements } from '../lib/supabase';
+import { supabase, fin, enrichPlacements, employeeNames } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { PLACEMENT_STATUS, INVOICE_STATUS, COMMISSION_BASE, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
@@ -9,6 +9,7 @@ export default function PlacementDetail() {
   const { id } = useParams();
   const { employee } = useAuth();
   const [p, setP] = useState<any>(null);
+  const [recruiterName, setRecruiterName] = useState<string>('—');
   const [invoices, setInvoices] = useState<any[]>([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
@@ -19,6 +20,10 @@ export default function PlacementDetail() {
     if (!r.data) { setErr('ההשמה לא נמצאה'); return; }
     const [enriched] = await enrichPlacements([r.data as any]);
     setP(enriched);
+    if (enriched.recruiter_id) {
+      const names = await employeeNames([enriched.recruiter_id]);
+      setRecruiterName(names[enriched.recruiter_id] ?? '—');
+    }
     const sched = await fin.from('payment_schedules').select('id').eq('placement_id', id).maybeSingle();
     if (sched.data) {
       const inv = await fin.from('invoices').select('*').eq('schedule_id', sched.data.id).order('seq');
@@ -64,6 +69,7 @@ export default function PlacementDetail() {
             <dt>שכר שסוכם</dt><dd>{money(p.agreed_salary, p.currency)}</dd>
             <dt>בסיס עמלה</dt><dd>{COMMISSION_BASE[p.commission_base]} · {p.commission_pct}%</dd>
             <dt>עמלה צפויה</dt><dd><strong>{money(p.expected_commission, p.currency)}</strong></dd>
+            <dt>מגייס זכאי</dt><dd>{recruiterName}</dd>
             <dt>תחילה צפויה</dt><dd>{formatDate(p.expected_start_date)}</dd>
             <dt>תחילה מאומתת</dt><dd>{formatDate(p.verified_start_date)}</dd>
             <dt>סיום אחריות</dt><dd>{formatDate(p.warranty_ends_on)}</dd>

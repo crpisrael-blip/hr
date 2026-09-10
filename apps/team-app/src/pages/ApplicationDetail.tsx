@@ -19,11 +19,20 @@ export default function ApplicationDetail() {
   const [interviews, setInterviews] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [emps, setEmps] = useState<any[]>([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+
+  useEffect(() => { supabase.from('employees').select('id, full_name').eq('employment_status','active').order('full_name').then(r=>{ if(!r.error) setEmps(r.data); }); }, []);
+
+  async function changeRecruiter(rid: string) {
+    if (!a) return;
+    const up = await supabase.from('applications').update({ recruiter_id: rid || null }).eq('id', a.id);
+    if (up.error) setErr(up.error.message); else load();
+  }
 
   async function load() {
     const r = await supabase.from('applications')
-      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, candidates(full_name), jobs(title, company_id, companies(name))')
+      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, recruiter_id, candidates(full_name), jobs(title, company_id, companies(name))')
       .eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('המועמדות לא נמצאה'); return; }
@@ -80,6 +89,15 @@ export default function ApplicationDetail() {
                   disabled={busy} onClick={() => transition(t.to, t.kind)}>{t.label}</button>
               ))}
             </div>
+          </div>
+
+          <div className="card" style={{ padding: 20 }}>
+            <h2 className="sec">מגייס אחראי</h2>
+            <select value={a.recruiter_id ?? ''} onChange={e => changeRecruiter(e.target.value)} style={{ width: '100%' }}>
+              <option value="">— ללא —</option>
+              {emps.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+            </select>
+            <span className="hint" style={{ marginTop: 8 }}>המגייס האחראי כאן הוא ברירת המחדל לזכאות הבונוס בעת יצירת ההשמה, שם ניתן לאמת אותו.</span>
           </div>
 
           <Interviews appId={a.id} rows={interviews} onChange={load} />
