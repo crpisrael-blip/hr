@@ -103,8 +103,14 @@ VITE_SUPABASE_ANON_KEY=<sb_publishable_...>
 
 ---
 
-## מה נשאר
-1. **סעיף 3.1** — Redirect URLs (לא תלוי בכלום; אפשר מיד).
-2. **סעיף 4** — אימות דומיין ב-Resend (DNS ב-Cloudflare).
-3. **סעיף 3.2** — SMTP ב-Supabase (אחרי שסעיף 4 מאומת).
-→ מתקן: הזמנת עובדים במייל (`invite-employee`) ו-OTP במייל למועמדים.
+## מצב נוכחי
+- סעיף 4 (Resend) ✅ מאומת · סעיף 3.2 (SMTP) ✅ מיילים יוצאים (הזמנה הגיעה).
+- ✅ הגשת מועמדות מהאתר עובדת מקצה לקצה.
+
+## מה נשאר (מיילים: מספאם לתיבה + קוד OTP)
+1. **תבניות מייל בעברית** — `supabase/templates/` (README שם). **חובה**: תבנית ברירת
+   המחדל שולחת קישור בלי `{{ .Token }}`, ואפליקציית המועמד מבקשת להקליד קוד.
+2. **DMARC** ב-Cloudflare DNS: `_dmarc` TXT → `v=DMARC1; p=none; rua=mailto:dmarc@ort-tech.co.il`
+   (SPF ו-DKIM כבר תקינים — נבדק; DMARC חסר, וזה מה ש-Gmail מעניש).
+3. **Resend → Domains → ort-tech.co.il → Open/Click tracking כבוי.**
+4. **סעיף 3.1** — לוודא ש-Redirect URLs מוגדרים (הקישור בהזמנה צריך להוביל ל-`hr-app.ort-tech.co.il`).
