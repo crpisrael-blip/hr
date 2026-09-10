@@ -68,10 +68,10 @@ export default function Login() {
 
         {sent && (
           <>
-            <p className="msg">שלחנו קוד בן 6 ספרות אל <b dir="ltr">{contact}</b>.</p>
+            <p className="msg">שלחנו קוד חד־פעמי אל <b dir="ltr">{contact}</b>.</p>
             <label><span className="lbl">קוד אימות</span>
-              <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6}
-                value={code} onChange={e => setCode(e.target.value)} dir="ltr" required autoFocus
+              <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={8}
+                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} dir="ltr" required autoFocus
                 style={{ letterSpacing: '.4em', textAlign: 'center', fontSize: '1.2rem' }} /></label>
             <button type="button" className="linkish" onClick={() => { setSent(false); setCode(''); }}>
               החלפת הפרטים / שליחה מחדש</button>
