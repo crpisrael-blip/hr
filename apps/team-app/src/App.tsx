@@ -24,6 +24,7 @@ import Reports from './pages/Reports';
 import Settlements from './pages/Settlements';
 import Settings from './pages/Settings';
 import Soon from './pages/Soon';
+import IdeaBubble from './components/IdeaBubble';
 
 export default function App() {
   const { session, employee, loading } = useAuth();
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {employee.role === 'superadmin' && <IdeaBubble />}
     </Layout>
   );
 }
