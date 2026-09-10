@@ -1,7 +1,16 @@
 import { type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 import Icon from './Icon';
+
+async function changePassword() {
+  const p = prompt('סיסמה חדשה (לפחות 6 תווים):');
+  if (!p) return;
+  if (p.length < 6) { alert('סיסמה קצרה מדי.'); return; }
+  const { error } = await supabase.auth.updateUser({ password: p });
+  alert(error ? 'שינוי הסיסמה נכשל: ' + error.message : 'הסיסמה עודכנה.');
+}
 
 const NAV = [
   { to: '/', label: 'דף הבית', icon: 'home', end: true },
@@ -57,6 +66,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="who-role">{roleLabel(employee?.role)}</span>
           </span>
         </button>
+        <button className="pw-link" onClick={changePassword}>שינוי סיסמה</button>
       </aside>
 
       <div className="main">

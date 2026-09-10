@@ -18,10 +18,11 @@ export default function EmployeeDetail() {
   const [docs, setDocs] = useState<any[]>([]);
   const [fb, setFb] = useState<any[]>([]);
   const [err, setErr] = useState(''); const [saved, setSaved] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState(''); const [inviting, setInviting] = useState(false);
 
   async function load() {
     const r = await supabase.from('employees')
-      .select('id, full_name, email, phone, role, job_title, hire_date, employment_status, notes')
+      .select('id, full_name, email, phone, role, job_title, hire_date, employment_status, notes, user_id, invited_at')
       .eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('העובד לא נמצא'); return; }
@@ -42,6 +43,14 @@ export default function EmployeeDetail() {
       employment_status: e.employment_status, notes: e.notes || null,
     }).eq('id', id);
     if (error) setErr(error.message); else setSaved(true);
+  }
+
+  async function invite() {
+    setInviting(true); setInviteMsg('');
+    const { error } = await supabase.functions.invoke('invite-employee', { body: { employee_id: id } });
+    setInviting(false);
+    if (error) { setInviteMsg('שגיאה: ' + (error.message || 'ההזמנה נכשלה')); return; }
+    setInviteMsg('הזמנה נשלחה למייל. אחרי לחיצה על הקישור המגייס ייכנס ויקבע סיסמה.'); load();
   }
 
   if (!isMgr) return <><PageHead title="עובד" /><p className="msg err">ניהול העובדים פתוח למנהלת בלבד.</p></>;
@@ -78,6 +87,16 @@ export default function EmployeeDetail() {
         </form>
 
         <div style={{ display:'grid', gap:16 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <h2 className="sec">כניסה למערכת</h2>
+            {e.user_id
+              ? <p className="msg ok">מקושר לכניסה{e.invited_at ? ` · הוזמן ${formatDate(e.invited_at)}` : ''}.</p>
+              : <>
+                  <p className="hint" style={{ marginBottom: 10 }}>שלחו הזמנה לדוא״ל <b dir="ltr">{e.email}</b>. המגייס ילחץ על הקישור, ייכנס למערכת ויקבע סיסמה.</p>
+                  <button className="btn btn-primary btn-sm" disabled={inviting} onClick={invite}>{inviting ? 'שולח…' : '✉️ הזמן לכניסה'}</button>
+                </>}
+            {inviteMsg && <p className={'msg ' + (inviteMsg.startsWith('שגיאה') ? 'err' : 'ok')} style={{ marginTop: 10 }}>{inviteMsg}</p>}
+          </div>
           <Documents empId={id!} rows={docs} onChange={load} />
           <Feedback empId={id!} authorId={employee?.id} rows={fb} onChange={load} />
         </div>

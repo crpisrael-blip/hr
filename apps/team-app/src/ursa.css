@@ -31,6 +31,7 @@ body { font-size:16px; background:#f0f9fd; }
 .promo-leaves i:nth-child(4) { bottom:90px; left:2px; transform:rotate(-70deg); }
 .promo-leaves i:nth-child(5) { bottom:5px; left:-6px; transform:rotate(-105deg); }
 .user-chip { display:flex; flex-direction:row-reverse; align-items:center; gap:14px; width:100%; padding:16px 8px 0; border:0; background:transparent; cursor:pointer; color:var(--ink); }
+.pw-link { border:0; background:transparent; color:var(--ink-mid,#4a5578); font:inherit; font-size:.8rem; cursor:pointer; padding:6px 8px 0; text-decoration:underline; text-align:start; }
 .ava { display:grid; place-items:center; flex:0 0 auto; width:44px; height:44px; border-radius:50%; background:linear-gradient(140deg,#1274b8,#073577); color:#fff; font-weight:700; }
 .who { display:flex; flex:1; flex-direction:column; text-align:right; min-width:0; }
 .who-name { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
