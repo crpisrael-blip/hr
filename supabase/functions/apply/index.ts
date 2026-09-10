@@ -12,7 +12,7 @@ function cors(origin: string | null) {
   const allow = origin && ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allow,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "content-type",
     "Vary": "Origin",
   };
@@ -32,7 +32,34 @@ Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
   const headers = { ...cors(origin), "Content-Type": "application/json; charset=utf-8" };
   if (req.method === "OPTIONS") return new Response("ok", { headers });
-  if (req.method !== "POST") return new Response(JSON.stringify({ error: "method" }), { status: 405, headers });
+  if (req.method !== "POST" && req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "method" }), { status: 405, headers });
+  }
+
+  // מפתח שירות: תומך בפורמט המפתחות החדש (sb_secret_ דרך SERVICE_ROLE_KEY)
+  // עם נפילה חזרה למפתח ה-service_role הישן שמוזרק אוטומטית.
+  const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceKey) {
+    console.error("apply: missing service key (SERVICE_ROLE_KEY / SUPABASE_SERVICE_ROLE_KEY)");
+    return new Response(JSON.stringify({ error: "server_misconfigured" }), { status: 500, headers });
+  }
+  const db = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    serviceKey,
+    { db: { schema: "app" }, auth: { persistSession: false } },
+  );
+
+  // GET: מחזיר את שדות טופס ההגשה הפעיל (השאלות הנוספות שהמנהלת הגדירה
+  // במערכת). האתר הסטטי מרנדר אותם מתחת לשדות הבסיס. אם אין טופס פעיל —
+  // מחזיר רשימה ריקה, והטופס הבסיסי ממשיך לעבוד כרגיל.
+  if (req.method === "GET") {
+    const { data, error } = await db.rpc("site_apply_form");
+    if (error) {
+      console.error("apply: site_apply_form failed:", error.message);
+      return new Response(JSON.stringify({ fields: [] }), { headers });
+    }
+    return new Response(JSON.stringify(data ?? { fields: [] }), { headers });
+  }
 
   let body: Record<string, string> = {};
   try {
@@ -57,18 +84,12 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "missing_fields" }), { status: 422, headers });
   }
 
-  // מפתח שירות: תומך בפורמט המפתחות החדש (sb_secret_ דרך SERVICE_ROLE_KEY)
-  // עם נפילה חזרה למפתח ה-service_role הישן שמוזרק אוטומטית.
-  const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!serviceKey) {
-    console.error("apply: missing service key (SERVICE_ROLE_KEY / SUPABASE_SERVICE_ROLE_KEY)");
-    return new Response(JSON.stringify({ error: "server_misconfigured" }), { status: 500, headers });
-  }
-  const db = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    serviceKey,
-    { db: { schema: "app" }, auth: { persistSession: false } },
-  );
+  // תשובות לשאלות הנוספות (מטופס ההגשה שהוגדר במערכת). נשמרות כ-JSON.
+  let extraAnswers: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(body.extra_answers || "{}");
+    if (parsed && typeof parsed === "object") extraAnswers = parsed;
+  } catch { /* התעלמות מתשובות לא תקינות — לא מפילים הגשה */ }
 
   // המשרה חייבת להיות מפורסמת. אין חשיפת מידע על קיום מאגר למבקר.
   const { data: pub, error: pubErr } = await db.from("job_publications")
@@ -105,7 +126,9 @@ Deno.serve(async (req) => {
   // מועמדות — לחיצה כפולה/הגשה חוזרת לא תיצור כפילות (unique candidate+job)
   const { data: appRow, error: aErr } = await db.from("applications")
     .upsert({ candidate_id: candidateId, job_id: pub.job_id, recruiter_id: job?.recruiter_id ?? null,
-              source: "website", stage: "new" }, { onConflict: "candidate_id,job_id" })
+              source: "website", stage: "new",
+              ...(Object.keys(extraAnswers).length ? { answers: extraAnswers } : {}) },
+            { onConflict: "candidate_id,job_id" })
     .select("id").single();
   if (aErr) return new Response(JSON.stringify({ error: "save_failed" }), { status: 500, headers });
 

@@ -33,6 +33,10 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
     <span class="hint">PDF או Word, עד 10MB. אפשר להגיש גם בלי לצרף.</span>
   </div>
 
+  <!-- שאלות נוספות שמוגדרות מהמערכת (בנאי הטפסים). מרונדרות בזמן ריצה,
+       כך שאפשר לערוך אותן בלי לפרוס מחדש את האתר. אם אין — נשאר ריק. -->
+  <div class="extra-fields" data-extra hidden></div>
+
   <label class="consent">
     <input type="checkbox" name="consent" value="true" required />
     <span>אני מאשר/ת שימוש בפרטים שלי לצורך תהליך הגיוס, לפי <a href="/privacy">מדיניות הפרטיות</a>.</span>
@@ -49,11 +53,66 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
 
+  const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+  // בונה HTML לשדה אחד לפי הגדרתו במערכת. תומך בסוגים הרלוונטיים לאתר.
+  function fieldHtml(f: any): string {
+    const id = 'x_' + f.key;
+    const req = f.required ? '<span class="req">*</span>' : '';
+    const lbl = `<label class="label" for="${id}">${esc(f.label)} ${req}</label>`;
+    const hint = f.help ? `<span class="hint">${esc(f.help)}</span>` : '';
+    const r = f.required ? 'required' : '';
+    if (f.type === 'heading') return `<h3 class="x-head">${esc(f.label)}</h3>`;
+    if (f.type === 'paragraph') return `<p class="x-para">${esc(f.label)}</p>`;
+    let control = '';
+    if (f.type === 'textarea') control = `<textarea id="${id}" name="${id}" rows="3" ${r}></textarea>`;
+    else if (f.type === 'boolean') return `<label class="consent"><input type="checkbox" id="${id}" name="${id}" value="true" ${r} /><span>${esc(f.label)}</span></label>`;
+    else if (f.type === 'select') {
+      const opts = (f.options ?? []).map((o: any) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+      control = `<select id="${id}" name="${id}" ${r}><option value="">בחר/י…</option>${opts}</select>`;
+    } else {
+      const t = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text';
+      control = `<input type="${t}" id="${id}" name="${id}" ${r} />`;
+    }
+    return `<div class="field">${lbl}${control}${hint}</div>`;
+  }
+
+  // טוען את שדות טופס ההגשה מהמערכת ומרנדר אותם. כשל אינו שובר את הטופס הבסיסי.
+  async function loadExtra(form: HTMLFormElement, box: HTMLElement) {
+    try {
+      const res = await fetch(form.dataset.endpoint!, { method: 'GET' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const fields = (data?.fields ?? []).slice().sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+      if (!fields.length) return;
+      box.innerHTML = fields.map(fieldHtml).join('');
+      box.dataset.keys = JSON.stringify(fields.filter((f: any) => !['heading', 'paragraph'].includes(f.type)).map((f: any) => ({ key: f.key, type: f.type })));
+      box.hidden = false;
+    } catch { /* נשארים עם הטופס הבסיסי */ }
+  }
+
+  // אוסף את תשובות השדות הנוספים לאובייקט.
+  function collectExtra(form: HTMLFormElement, box: HTMLElement): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    let keys: { key: string; type: string }[] = [];
+    try { keys = JSON.parse(box.dataset.keys || '[]'); } catch { /* noop */ }
+    for (const { key, type } of keys) {
+      const el = form.querySelector<HTMLInputElement>(`[name="x_${key}"]`);
+      if (!el) continue;
+      out[key] = type === 'boolean' ? el.checked : el.value.trim();
+    }
+    return out;
+  }
+
   document.querySelectorAll<HTMLFormElement>('form.apply').forEach(form => {
     const status = form.querySelector<HTMLElement>('.form-status')!;
     const submit = form.querySelector<HTMLButtonElement>('.submit')!;
     const file = form.querySelector<HTMLInputElement>('#cv');
+    const extraBox = form.querySelector<HTMLElement>('[data-extra]')!;
     let sending = false;
+
+    loadExtra(form, extraBox);
 
     function say(msg: string, kind: 'ok' | 'err' | 'info') {
       status.hidden = false;
@@ -77,7 +136,10 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
       sending = true; submit.disabled = true;
       say('שולח…', 'info');
       try {
-        const res = await fetch(form.dataset.endpoint!, { method: 'POST', body: new FormData(form) });
+        const fd = new FormData(form);
+        const extra = collectExtra(form, extraBox);
+        if (Object.keys(extra).length) fd.set('extra_answers', JSON.stringify(extra));
+        const res = await fetch(form.dataset.endpoint!, { method: 'POST', body: fd });
         if (!res.ok) throw new Error(String(res.status));
         form.reset();
         say('קיבלנו את המועמדות שלך. ניצור קשר בהקדם.', 'ok');
@@ -93,6 +155,9 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
 
 <style>
   .apply { display: grid; gap: 15px; }
+  .extra-fields { display: grid; gap: 15px; }
+  .x-head { font-size: 1rem; font-weight: 700; margin: 6px 0 0; color: var(--ink); }
+  .x-para { font-size: .9rem; color: var(--ink-mid); margin: 0; line-height: 1.5; }
   .req { color: var(--accent); }
   .consent { display: flex; gap: 9px; align-items: start; font-size: .88rem; color: var(--ink-mid); line-height: 1.5; }
   .consent input { margin-block-start: 3px; inline-size: auto; min-height: 0; }

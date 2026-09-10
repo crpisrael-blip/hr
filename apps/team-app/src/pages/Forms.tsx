@@ -41,7 +41,7 @@ export default function Forms() {
                 <div className="spread">
                   <div>
                     <h2 style={{ margin:0, fontSize:'1.05rem' }}>{t.name}</h2>
-                    <div className="hint">{RECIPIENT[t.recipient_type]} · {(t.definition?.fields?.length ?? 0)} שדות · <span className={'tag '+(t.status==='active'?'ok':'mute')}>{TSTATUS[t.status]}</span></div>
+                    <div className="hint">{RECIPIENT[t.recipient_type]} · {(t.definition?.fields?.length ?? 0)} שדות · <span className={'tag '+(t.status==='active'?'ok':'mute')}>{TSTATUS[t.status]}</span>{t.is_site_apply && <> · <span className="tag brand">טופס ההגשה באתר</span></>}</div>
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
                     <Link to={`/forms/${t.id}`} className="btn btn-quiet btn-sm">✏️ עריכה</Link>

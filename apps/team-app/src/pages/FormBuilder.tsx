@@ -27,6 +27,7 @@ export default function FormBuilder() {
   const [filingTarget, setFilingTarget] = useState('general');
   const [filingCategory, setFilingCategory] = useState('');
   const [status, setStatus] = useState('draft');
+  const [siteApply, setSiteApply] = useState(false);
   const [fields, setFields] = useState<Field[]>([]);
   const [maps, setMaps] = useState<MapRow[]>([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
@@ -37,6 +38,7 @@ export default function FormBuilder() {
       if (error || !data) { setErr('התבנית לא נמצאה'); return; }
       setName(data.name ?? ''); setDescription(data.description ?? ''); setRecipient(data.recipient_type);
       setFilingTarget(data.filing_target ?? 'general'); setFilingCategory(data.filing_category ?? ''); setStatus(data.status);
+      setSiteApply(!!data.is_site_apply);
       setFields((data.definition?.fields ?? []) as Field[]); setMaps((data.field_map ?? []) as MapRow[]);
     });
   }, [id, editing]);
@@ -57,7 +59,10 @@ export default function FormBuilder() {
       definition: { fields: fields.map((f, i) => ({ ...f, order: i })) },
       field_map: maps.filter(m => m.field_key && m.table && m.column),
       filing_target: filingTarget, filing_category: filingCategory.trim() || null, status,
+      is_site_apply: siteApply,
     };
+    // רק תבנית אחת יכולה לשמש כטופס ההגשה באתר — מכבים אחרות לפני השמירה.
+    if (siteApply) await supabase.from('form_templates').update({ is_site_apply: false }).eq('is_site_apply', true);
     const res = editing
       ? await supabase.from('form_templates').update(body).eq('id', id).select('id').single()
       : await supabase.from('form_templates').insert(body).select('id').single();
@@ -88,6 +93,12 @@ export default function FormBuilder() {
             <datalist id="form-categories">{FORM_CATEGORIES.map(c=><option key={c} value={c} />)}</datalist></label>
           <label><span className="lbl">סטטוס</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="draft">טיוטה</option><option value="active">פעיל</option><option value="archived">בארכיון</option></select></label>
         </div>
+        {recipient === 'candidate' && (
+          <label style={{ flexDirection: 'row', alignItems: 'center', gap: 10, background: 'var(--surface-sunk)', padding: '10px 12px', borderRadius: 9 }}>
+            <input type="checkbox" checked={siteApply} onChange={e => setSiteApply(e.target.checked)} style={{ width: 18, height: 18 }} />
+            <span>השתמש כטופס ההגשה באתר — השדות יופיעו מתחת לשדות הבסיס (שם/טלפון/דוא״ל/קו״ח). רק תבנית פעילה אחת יכולה לשמש לכך.</span>
+          </label>
+        )}
       </div>
 
       <div className="card" style={{ padding: 20, marginBottom: 16 }}>
