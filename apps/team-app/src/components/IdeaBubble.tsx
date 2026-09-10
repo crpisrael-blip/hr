@@ -53,6 +53,8 @@ export default function IdeaBubble() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [copied, setCopied] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
 
   const drag = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
 
@@ -108,6 +110,16 @@ export default function IdeaBubble() {
   }
   const toggle = (i: Idea, s: Status) => setStatus(i.id, i.status === s ? 'open' : s);
 
+  function startEdit(i: Idea) { setEditingId(i.id); setEditText(i.body); }
+  async function saveEdit() {
+    const t = editText.trim();
+    if (!t || !editingId) { setEditingId(null); return; }
+    const id = editingId;
+    await supabase.from('dev_ideas').update({ body: t }).eq('id', id);
+    setIdeas(list => list.map(x => x.id === id ? { ...x, body: t } : x));
+    setEditingId(null);
+  }
+
   function copyForLLM() {
     const active = ideas.filter(i => i.status !== 'done');
     const groups = KINDS.map(({ k, label }) => {
@@ -129,16 +141,35 @@ export default function IdeaBubble() {
     <li key={i.id} className={'ib-item st-' + i.status}>
       <div className="ib-item-top">
         <span className="ib-chip" title={KMAP[i.kind].label}>{KMAP[i.kind].icon}</span>
-        <p className="ib-body">{i.body}</p>
+        {editingId === i.id ? (
+          <textarea className="ib-edit" value={editText} autoFocus rows={2}
+            onChange={e => setEditText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit();
+              if (e.key === 'Escape') setEditingId(null);
+            }} />
+        ) : (
+          <p className="ib-body">{i.body}</p>
+        )}
       </div>
       <div className="ib-meta">
         <span className="ib-ctx">{i.context ?? '—'}</span>
         <span className="ib-row-actions">
-          <button className={i.status === 'in_progress' ? 'on' : ''} title="בעבודה" aria-label="בעבודה"
-            onClick={() => toggle(i, 'in_progress')}>⏳</button>
-          <button className={i.status === 'done' ? 'on' : ''} title={i.status === 'done' ? 'החזרה לפתוח' : 'טופל'}
-            aria-label="טופל" onClick={() => toggle(i, 'done')}>✓</button>
-          <button title="מחיקה" aria-label="מחיקה" onClick={() => remove(i.id)}>🗑</button>
+          {editingId === i.id ? (
+            <>
+              <button className="on" title="שמירה" aria-label="שמירה" onClick={saveEdit}>✓</button>
+              <button title="ביטול" aria-label="ביטול" onClick={() => setEditingId(null)}>✕</button>
+            </>
+          ) : (
+            <>
+              <button title="עריכה" aria-label="עריכה" onClick={() => startEdit(i)}>✏️</button>
+              <button className={i.status === 'in_progress' ? 'on' : ''} title="בעבודה" aria-label="בעבודה"
+                onClick={() => toggle(i, 'in_progress')}>⏳</button>
+              <button className={i.status === 'done' ? 'on' : ''} title={i.status === 'done' ? 'החזרה לפתוח' : 'טופל'}
+                aria-label="טופל" onClick={() => toggle(i, 'done')}>✓</button>
+              <button title="מחיקה" aria-label="מחיקה" onClick={() => remove(i.id)}>🗑</button>
+            </>
+          )}
         </span>
       </div>
     </li>
@@ -258,6 +289,9 @@ export default function IdeaBubble() {
         .ib-item-top { display: flex; gap: 7px; align-items: flex-start; }
         .ib-chip { font-size: 15px; line-height: 1.4; flex: 0 0 auto; }
         .ib-body { margin: 0; font-size: .88rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+        .ib-edit { flex: 1; font: inherit; font-size: .86rem; padding: 5px 8px; border: 1.5px solid #90c0f8;
+          border-radius: 8px; background: #fff; resize: vertical; }
+        .ib-edit:focus { outline: none; }
         .ib-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 5px; }
         .ib-ctx { color: #7d87a6; font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ib-row-actions { display: flex; gap: 3px; flex: 0 0 auto; }
