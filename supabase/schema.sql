@@ -2280,7 +2280,15 @@ grant select on app.job_stage_history to authenticated;
 -- (create or replace אינו יכול לשנות טיפוס־החזרה, ולכן ריצות מאוחרות נכשלו בשקט).
 -- הפתרון: DROP מפורש ואז יצירה מחדש עם החזרת uuid, ורענון מטמון הסכימה.
 
-drop function if exists app.compute_monthly_bonus(uuid, date);
+-- מחיקת כל גרסה קיימת של הפונקציה, ללא תלות בחתימת הארגומנטים או טיפוס־ההחזרה,
+-- כדי לחסל בוודאות גרסה תקועה עם טיפוס־החזרה שגוי.
+do $$
+declare r record;
+begin
+  for r in select oid::regprocedure as sig from pg_proc
+           where pronamespace = 'app'::regnamespace and proname = 'compute_monthly_bonus'
+  loop execute 'drop function ' || r.sig || ' cascade'; end loop;
+end $$;
 
 create function app.compute_monthly_bonus(p_employee uuid, p_month date)
 returns uuid language plpgsql security definer set search_path = app, finance, public as $$
