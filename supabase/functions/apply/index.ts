@@ -3,10 +3,15 @@
 // למסד מהאזור הציבורי. האתר הסטטי עצמו לעולם אינו נוגע במסד.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 
+// דומיינים מורשים להגשה מהדפדפן. כולל את הדומיינים בייצור וגם את כתובת
+// ברירת המחדל של Cloudflare Workers (עד שהדומיין המותאם מחובר). ניתן
+// להוסיף דומיין נוסף דרך משתנה הסביבה APPLY_ALLOW_ORIGIN בלי לשנות קוד.
 const ALLOW_ORIGINS = [
   "https://hr.ort-tech.co.il",
   "https://my.hr.ort-tech.co.il",
-];
+  "https://hr-public-site.menahemtzik1.workers.dev",
+  Deno.env.get("APPLY_ALLOW_ORIGIN") ?? "",
+].filter(Boolean);
 
 function cors(origin: string | null) {
   const allow = origin && ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
