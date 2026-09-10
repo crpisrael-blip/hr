@@ -31,16 +31,20 @@ Deno.serve(async (req) => {
   // זהות הקורא — מהטוקן שנשלח מהאפליקציה.
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers });
-  const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers });
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const userClient = createClient(url, anon, { auth: { persistSession: false } });
+  const { data: { user }, error: uErr } = await userClient.auth.getUser(token);
+  if (!user) return new Response(JSON.stringify({ error: "unauthorized", detail: uErr?.message }), { status: 401, headers });
 
   const svc = createClient(url, serviceKey, { db: { schema: "app" }, auth: { persistSession: false } });
 
   // אימות שהקורא מנהלת/מנהל על.
   const me = await svc.from("employees").select("role").eq("user_id", user.id).maybeSingle();
   if (!me.data || !["manager", "superadmin"].includes(me.data.role)) {
-    return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers });
+    return new Response(JSON.stringify({
+      error: "forbidden",
+      detail: JSON.stringify({ uid: user.id, role: me.data?.role ?? null, dbError: me.error?.message ?? null }),
+    }), { status: 403, headers });
   }
 
   let body: Record<string, string> = {};
