@@ -16,8 +16,9 @@ body { font-size:16px; background:#f0f9fd; }
 .side-logo { padding:0 8px 12px; }
 .side-logo img { width:100%; max-width:192px; height:auto; display:block; }
 .side nav { display:flex; flex-direction:column; gap:4px; }
-.nav-item { display:flex; flex-direction:row-reverse; justify-content:flex-end; align-items:center; gap:25px; min-height:46px; padding:10px 20px; border-radius:10px; font-size:17px; text-decoration:none; color:#101653; white-space:nowrap; }
-.nav-item .ic { display:flex; width:24px; flex-shrink:0; }
+.nav-item { display:flex; flex-direction:row; justify-content:flex-start; align-items:center; gap:14px; min-height:46px; padding:10px 18px; border-radius:10px; font-size:17px; text-decoration:none; color:#101653; white-space:nowrap; }
+.nav-item .ic { display:flex; align-items:center; justify-content:center; width:24px; height:24px; flex-shrink:0; }
+.nav-item .ic svg { display:block; }
 .nav-item:hover { background:#eaf5fc; }
 .nav-item.active { background:#bfdcf4; color:#064588; font-weight:700; }
 .promo { position:relative; margin-top:auto; min-height:166px; border-radius:14px; padding:20px 16px 20px 64px; overflow:hidden; background:linear-gradient(135deg,#f4fcff,#d7edfc); }

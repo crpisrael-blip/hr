@@ -54,7 +54,10 @@ export default function CandidateDetail() {
   return (
     <>
       <PageHead title={c.full_name} sub="כרטיס מועמד"
-        action={<Link to={`/applications/new?candidate=${c.id}`} className="btn btn-primary btn-sm">+ מועמדות למשרה</Link>} />
+        action={<>
+          <Link to={`/candidates/${c.id}/edit`} className="btn btn-quiet btn-sm">✏️ עריכה</Link>
+          <Link to={`/applications/new?candidate=${c.id}`} className="btn btn-primary btn-sm">+ מועמדות למשרה</Link>
+        </>} />
       <div className="grid2">
         <div className="card" style={{ padding: 20 }}>
           <h2 className="sec">פרטים</h2>

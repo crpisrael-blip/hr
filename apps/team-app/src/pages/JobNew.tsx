@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import PageHead from '../components/PageHead';
 
@@ -7,6 +7,8 @@ interface Company { id: string; name: string; }
 
 export default function JobNew() {
   const nav = useNavigate();
+  const { id } = useParams();
+  const editing = !!id;
   const [companies, setCompanies] = useState<Company[]>([]);
   const [form, setForm] = useState({
     company_id: '', title: '', internal_description: '', location: '',
@@ -20,26 +22,44 @@ export default function JobNew() {
       .then(r => { if (!r.error) setCompanies(r.data as Company[]); });
   }, []);
 
+  useEffect(() => {
+    if (!editing) return;
+    supabase.from('jobs').select('company_id, title, internal_description, location, employment_scope, headcount, salary_min, salary_max')
+      .eq('id', id).maybeSingle().then(({ data, error }) => {
+        if (error || !data) { setErr('המשרה לא נמצאה'); return; }
+        setForm({
+          company_id: data.company_id ?? '', title: data.title ?? '',
+          internal_description: data.internal_description ?? '', location: data.location ?? '',
+          employment_scope: data.employment_scope ?? 'full_time', headcount: data.headcount ?? 1,
+          salary_min: data.salary_min != null ? String(data.salary_min) : '',
+          salary_max: data.salary_max != null ? String(data.salary_max) : '',
+        });
+      });
+  }, [id, editing]);
+
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm(f => ({ ...f, [k]: v })); }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault(); setErr(''); setBusy(true);
-    const { error } = await supabase.from('jobs').insert({
+    const body: any = {
       company_id: form.company_id, title: form.title.trim(),
       internal_description: form.internal_description.trim() || null,
       location: form.location.trim() || null, employment_scope: form.employment_scope,
       headcount: Number(form.headcount) || 1,
       salary_min: form.salary_min ? Number(form.salary_min) : null,
       salary_max: form.salary_max ? Number(form.salary_max) : null,
-      stage: 'draft',
-    });
+    };
+    if (!editing) body.stage = 'draft';
+    const { error } = editing
+      ? await supabase.from('jobs').update(body).eq('id', id)
+      : await supabase.from('jobs').insert(body);
     setBusy(false);
     if (error) setErr(error.message); else nav('/jobs');
   }
 
   return (
     <>
-      <PageHead title="משרה חדשה" />
+      <PageHead title={editing ? 'עריכת משרה' : 'משרה חדשה'} />
       {companies.length === 0 && <p className="msg err" style={{ marginBottom: 16 }}>
         צריך קודם להקים חברה. <a href="/companies/new">להקמת חברה</a></p>}
       <form className="card" style={{ padding: 24, maxWidth: 620, display: 'grid', gap: 16 }} onSubmit={onSubmit}>

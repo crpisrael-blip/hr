@@ -75,9 +75,13 @@ export default function Jobs() {
                     <header><span className="tag brand">{JOB_STAGE[r.stage]}</span>{pub ? <span className="tag ok">מפורסמת</span> : <span className="tag">לא מפורסמת</span>}</header>
                     <h2>{r.title}</h2>
                     <dl><dt>חברה</dt><dd>{r.companies?.name ?? '—'}</dd><dt>מיקום</dt><dd>{r.location ?? '—'}</dd><dt>היקף</dt><dd>{r.employment_scope ? SCOPE[r.employment_scope] : '—'}</dd></dl>
-                    <footer><span className="hint">{r.headcount} תקנים</span>{pub
-                      ? <button className="btn btn-quiet btn-sm" disabled={busy===r.id} onClick={() => unpublish(r)}>הסרה</button>
-                      : <button className="btn btn-primary btn-sm" disabled={busy===r.id} onClick={() => publish(r)}>{busy===r.id?'…':'פרסום'}</button>}
+                    <footer><span className="hint">{r.headcount} תקנים</span>
+                      <span style={{ display: 'flex', gap: 8 }}>
+                        <Link to={`/jobs/${r.id}/edit`} className="btn btn-quiet btn-sm">✏️ עריכה</Link>
+                        {pub
+                          ? <button className="btn btn-quiet btn-sm" disabled={busy===r.id} onClick={() => unpublish(r)}>הסרה</button>
+                          : <button className="btn btn-primary btn-sm" disabled={busy===r.id} onClick={() => publish(r)}>{busy===r.id?'…':'פרסום'}</button>}
+                      </span>
                     </footer>
                   </article>
                 );

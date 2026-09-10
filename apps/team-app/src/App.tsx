@@ -51,8 +51,10 @@ export default function App() {
         <Route path="/companies/:id" element={<CompanyDetail />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/new" element={<JobNew />} />
+        <Route path="/jobs/:id/edit" element={<JobNew />} />
         <Route path="/candidates" element={<Candidates />} />
         <Route path="/candidates/new" element={<CandidateNew />} />
+        <Route path="/candidates/:id/edit" element={<CandidateNew />} />
         <Route path="/candidates/:id" element={<CandidateDetail />} />
         <Route path="/applications" element={<Applications />} />
         <Route path="/applications/new" element={<ApplicationNew />} />
