@@ -3,6 +3,8 @@
 // מופיעה אוטומטית בכל המקומות הרלוונטיים: "מיועד ל", "יעד תיוק", מיפוי
 // לשדות המערכת, וקישור בשליחה. אין לשכפל רשימות קשיחות במסכים.
 
+export interface EntityColumn { col: string; label: string }
+
 export interface EntityType {
   key: string;          // מזהה הסוג (נשמר ב-form_instances.entity_type / form_templates.filing_target)
   label: string;        // תווית בעברית
@@ -12,13 +14,38 @@ export interface EntityType {
   filing?: boolean;     // יכול לשמש כיעד תיוק
   mappable?: boolean;   // ניתן למפות אליו שדות (עדכון עמודות)
   linkable?: boolean;   // ניתן לבחור/לחפש בעת שליחה
+  columns?: EntityColumn[]; // עמודות שמותר למפות אליהן תשובות מהטופס (עם תווית בעברית)
 }
 
 // ★ להוספת סוג ישות חדש — מוסיפים כאן שורה אחת בלבד.
+// עמודות המיפוי (columns) תואמות לשמות העמודות בפועל במסד (schema app).
 export const ENTITIES: EntityType[] = [
-  { key: 'candidate',   label: 'מועמד',       table: 'candidates',  nameCol: 'full_name', recipient: 'candidate', filing: true, mappable: true, linkable: true },
-  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, mappable: true, linkable: true },
-  { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true },
+  { key: 'candidate',   label: 'מועמד',       table: 'candidates',  nameCol: 'full_name', recipient: 'candidate', filing: true, mappable: true, linkable: true,
+    columns: [
+      { col: 'full_name',        label: 'שם מלא' },
+      { col: 'phone_raw',        label: 'טלפון' },
+      { col: 'email',            label: 'דוא״ל' },
+      { col: 'years_experience', label: 'שנות ניסיון' },
+      { col: 'desired_salary',   label: 'שכר מבוקש' },
+      { col: 'availability',     label: 'זמינות' },
+      { col: 'source',           label: 'מקור' },
+      { col: 'skills',           label: 'כישורים (רשימה)' },
+    ] },
+  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, mappable: true, linkable: true,
+    columns: [
+      { col: 'full_name', label: 'שם מלא' },
+      { col: 'email',     label: 'דוא״ל' },
+      { col: 'phone',     label: 'טלפון' },
+      { col: 'job_title', label: 'תפקיד' },
+      { col: 'notes',     label: 'הערות' },
+    ] },
+  { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true,
+    columns: [
+      { col: 'name',        label: 'שם החברה' },
+      { col: 'business_id', label: 'ח״פ / עוסק' },
+      { col: 'website',     label: 'אתר' },
+      { col: 'notes',       label: 'הערות' },
+    ] },
   { key: 'application', label: 'מועמדות',      table: 'applications', nameCol: null,        filing: true },
   { key: 'placement',   label: 'השמה',         table: 'placements',  nameCol: null,        filing: true },
 ];
@@ -44,6 +71,9 @@ export const MAPPABLE = ENTITIES.filter(e => e.mappable);
 
 export const entityByKey = (k?: string | null) => ENTITIES.find(e => e.key === k) || null;
 export const tableForEntity = (k?: string | null) => entityByKey(k)?.table ?? null;
+export const entityByTable = (t?: string | null) => ENTITIES.find(e => e.table === t) || null;
+// עמודות שמותר למפות אליהן לפי שם הטבלה (לרשימת בחירה בבנאי הטפסים).
+export const columnsForTable = (t?: string | null): EntityColumn[] => entityByTable(t)?.columns ?? [];
 
 // קטגוריות תיוק/גיוס — רשימה מרכזית. מוצגות כהצעות (עם אפשרות טקסט חופשי).
 export const FORM_CATEGORIES: string[] = [

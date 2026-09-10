@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { RECIPIENTS, FILING_TARGETS, MAPPABLE, FORM_CATEGORIES } from '../lib/entities';
+import { RECIPIENTS, FILING_TARGETS, MAPPABLE, FORM_CATEGORIES, columnsForTable } from '../lib/entities';
 import PageHead from '../components/PageHead';
 
 const TYPES: [string, string][] = [
@@ -143,8 +143,12 @@ export default function FormBuilder() {
                   <option value="">שדה בטופס…</option>
                   {fields.filter(f => !['heading','paragraph'].includes(f.type)).map(f => <option key={f.key} value={f.key}>{f.label || f.key}</option>)}
                 </select>
-                <select value={m.table} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, table: e.target.value } : x))}>{MAPPABLE.map(en=><option key={en.table} value={en.table}>{en.label}</option>)}</select>
-                <input placeholder="עמודה (phone_raw)" value={m.column} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, column: e.target.value } : x))} dir="ltr" />
+                <select value={m.table} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, table: e.target.value, column: '' } : x))}>{MAPPABLE.map(en=><option key={en.table} value={en.table}>{en.label}</option>)}</select>
+                <select value={m.column} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, column: e.target.value } : x))}>
+                  <option value="">בחר/י עמודה…</option>
+                  {columnsForTable(m.table).map(c => <option key={c.col} value={c.col}>{c.label}</option>)}
+                  {m.column && !columnsForTable(m.table).some(c => c.col === m.column) && <option value={m.column}>{m.column}</option>}
+                </select>
                 <select value={m.mode} onChange={e => setMaps(a => a.map((x, n) => n === i ? { ...x, mode: e.target.value as any } : x))}><option value="approve">לאישור</option><option value="auto">אוטומטי</option></select>
                 <button className="btn btn-quiet btn-sm" onClick={() => setMaps(a => a.filter((_, n) => n !== i))}>🗑</button>
               </div>
