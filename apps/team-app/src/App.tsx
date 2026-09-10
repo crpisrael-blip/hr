@@ -15,9 +15,13 @@ import Applications from './pages/Applications';
 import ApplicationNew from './pages/ApplicationNew';
 import ApplicationDetail from './pages/ApplicationDetail';
 import Tasks from './pages/Tasks';
+import TaskNew from './pages/TaskNew';
+import TaskDetail from './pages/TaskDetail';
 import Placements from './pages/Placements';
 import PlacementNew from './pages/PlacementNew';
 import PlacementDetail from './pages/PlacementDetail';
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 import Soon from './pages/Soon';
 
 export default function App() {
@@ -52,12 +56,14 @@ export default function App() {
         <Route path="/applications/new" element={<ApplicationNew />} />
         <Route path="/applications/:id" element={<ApplicationDetail />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/tasks/new" element={<TaskNew />} />
+        <Route path="/tasks/:id" element={<TaskDetail />} />
         <Route path="/placements" element={<Placements />} />
         <Route path="/placements/new" element={<PlacementNew />} />
         <Route path="/placements/:id" element={<PlacementDetail />} />
-        <Route path="/reports" element={<Soon title="דוחות" />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/calendar" element={<Soon title="לוח שנה" />} />
-        <Route path="/settings" element={<Soon title="הגדרות" />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
