@@ -45,11 +45,21 @@ export default function EmployeeDetail() {
     if (error) setErr(error.message); else setSaved(true);
   }
 
+  const INVITE_ERR: Record<string,string> = {
+    forbidden: 'רק מנהלת יכולה להזמין.', already_linked: 'העובד כבר מקושר לחשבון כניסה.',
+    not_found: 'העובד לא נמצא.', invite_failed: 'שליחת ההזמנה נכשלה (ייתכן שהדוא״ל כבר קיים במערכת, או שכתובת ה-Redirect לא מוגדרת).',
+    missing_employee: 'חסר מזהה עובד.', server_misconfigured: 'הפונקציה חסרה מפתח שירות.',
+  };
   async function invite() {
     setInviting(true); setInviteMsg('');
     const { error } = await supabase.functions.invoke('invite-employee', { body: { employee_id: id } });
     setInviting(false);
-    if (error) { setInviteMsg('שגיאה: ' + (error.message || 'ההזמנה נכשלה')); return; }
+    if (error) {
+      let code = ''; let detail = '';
+      try { const b = await (error as any).context.json(); code = b.error || ''; detail = b.detail || ''; } catch { /* ignore */ }
+      setInviteMsg('שגיאה: ' + (INVITE_ERR[code] || code || error.message) + (detail ? ` (${detail})` : ''));
+      return;
+    }
     setInviteMsg('הזמנה נשלחה למייל. אחרי לחיצה על הקישור המגייס ייכנס ויקבע סיסמה.'); load();
   }
 
