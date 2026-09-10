@@ -9,11 +9,19 @@ interface Candidate {
   skills: string[] | null; desired_salary: number | null; availability: string | null; source: string | null; created_at: string;
 }
 interface Appl { id: string; stage: string; stage_changed_at: string; jobs: { title: string } | null; }
+interface Doc { id: string; kind: string; file_name: string; storage_path: string; size_bytes: number; created_at: string; }
+
+const DOC_KIND: Record<string, string> = {
+  cv: 'קורות חיים', cover_letter: 'מכתב מקדים', certificate: 'תעודה',
+  summary: 'סיכום', submission_pack: 'ערכת הגשה', other: 'מסמך',
+};
+const fmtSize = (b: number) => b < 1048576 ? `${(b / 1024).toFixed(0)} ק״ב` : `${(b / 1048576).toFixed(1)} מ״ב`;
 
 export default function CandidateDetail() {
   const { id } = useParams();
   const [c, setC] = useState<Candidate | null>(null);
   const [apps, setApps] = useState<Appl[]>([]);
+  const [docs, setDocs] = useState<Doc[]>([]);
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -28,8 +36,17 @@ export default function CandidateDetail() {
         .select('id, stage, stage_changed_at, jobs(title)').eq('candidate_id', id)
         .order('stage_changed_at', { ascending: false });
       if (!ar.error) setApps(ar.data as any);
+      const dr = await supabase.from('documents')
+        .select('id, kind, file_name, storage_path, size_bytes, created_at').eq('candidate_id', id)
+        .order('created_at', { ascending: false });
+      if (!dr.error) setDocs(dr.data as any);
     })();
   }, [id]);
+
+  async function openDoc(d: Doc) {
+    const { data } = await supabase.storage.from('candidate-docs').createSignedUrl(d.storage_path, 120);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  }
 
   if (err) return <p className="msg err">{err}</p>;
   if (!c) return <p className="spinner">טוען…</p>;
@@ -66,6 +83,21 @@ export default function CandidateDetail() {
             </ul>
           )}
         </div>
+      </div>
+      <div className="card" style={{ padding: 20, marginTop: 16 }}>
+        <h2 className="sec">מסמכים ({docs.length})</h2>
+        {docs.length === 0 ? <p className="hint">אין מסמכים.</p> : (
+          <ul className="linklist">
+            {docs.map(d => (
+              <li key={d.id}>
+                <a href="#" onClick={e => { e.preventDefault(); openDoc(d); }}>
+                  <span>📄 {d.file_name}</span>
+                  <span className="hint">{DOC_KIND[d.kind] ?? d.kind} · {fmtSize(d.size_bytes)} · {formatDate(d.created_at)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <style>{`
         .grid2 { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; align-items: start; }
