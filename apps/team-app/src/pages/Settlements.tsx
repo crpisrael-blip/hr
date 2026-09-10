@@ -40,9 +40,6 @@ export default function Settlements() {
         .submenu button { background:var(--sunk); border:1px solid var(--line); border-radius:999px; padding:7px 16px; cursor:pointer; color:var(--ink-mid); font-weight:600; font-size:.9rem; }
         .submenu button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
         .submenu button.soon { opacity:.5; cursor:default; }
-        .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line); }
-        .tabs button { background:none; border:none; padding:10px 14px; cursor:pointer; color:var(--ink-mid); font-weight:600; border-bottom:2px solid transparent; }
-        .tabs button.on { color:var(--brand-ink); border-bottom-color:var(--accent); }
         .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:16px; }
         .bar label { display:grid; gap:5px; }
         .bar .lbl { font-size:.82rem; font-weight:600; }

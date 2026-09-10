@@ -126,19 +126,8 @@ export default function JobDetail() {
         </div>
       </div>
       <style>{`
-        .grid2 { display: grid; gap: 16px; grid-template-columns: 1.2fr 1fr; align-items: start; }
-        .sec { font-size: 1.05rem; margin-bottom: 12px; }
-        .spread { display: flex; justify-content: space-between; align-items: center; }
-        .dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; margin: 0; }
-        .dl dt { color: var(--ink-soft); font-size: .88rem; } .dl dd { margin: 0; }
         .sub-h { font-size: .9rem; color: var(--ink-soft); margin: 14px 0 4px; }
         .txt { margin: 0; white-space: pre-wrap; line-height: 1.5; }
-        .linklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-        .linklist a { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
-        .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-        .timeline li { border-inline-start: 2px solid var(--line-strong); padding-inline-start: 12px; }
-        .tl-row { display: flex; justify-content: space-between; gap: 10px; }
-        @media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
       `}</style>
     </>
   );

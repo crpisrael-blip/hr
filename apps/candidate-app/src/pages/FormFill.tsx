@@ -68,8 +68,8 @@ export default function FormFill({ token }: { token: string }) {
         <div className="ff-fields">
           {fields.filter(visible).map(f => <FieldView key={f.key} f={f} value={answers[f.key]} onChange={v => set(f.key, v)} />)}
         </div>
-        {err && <p className="msg err">{err}</p>}
-        {savedNote && <p className="msg ok">{savedNote}</p>}
+        {err && <p className="msg err" role="alert">{err}</p>}
+        {savedNote && <p className="msg ok" aria-live="polite">{savedNote}</p>}
         <div className="ff-actions">
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={save}>שמירה להמשך</button>
           <button className="btn btn-primary" disabled={busy}>{busy ? '…' : 'שליחה'}</button>

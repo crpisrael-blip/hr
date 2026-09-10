@@ -72,12 +72,6 @@ export default function Forms() {
           </div>
         )
       )}
-      <style>{`
-        .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line); }
-        .tabs button { background:none; border:none; padding:10px 14px; cursor:pointer; color:var(--ink-mid); font-weight:600; border-bottom:2px solid transparent; }
-        .tabs button.on { color:var(--brand-ink); border-bottom-color:var(--accent); }
-        .spread { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-      `}</style>
     </>
   );
 }
