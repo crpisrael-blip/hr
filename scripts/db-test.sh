@@ -5,11 +5,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# רולים ש-Supabase מספקת מובנית ושהמיגרציות מעניקות להם הרשאות.
+# על Postgres נקי לבדיקות יוצרים אותם כאן; על Supabase הם כבר קיימים.
+ROLES_SQL="do \$\$ begin
+  if not exists (select from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+  if not exists (select from pg_roles where rolname='anon')          then create role anon nologin; end if;
+  if not exists (select from pg_roles where rolname='service_role')  then create role service_role nologin; end if;
+end \$\$;"
+
 if [[ -n "${DATABASE_URL:-}" ]]; then
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "$ROLES_SQL"
   for f in supabase/migrations/*.sql; do
     echo "→ $(basename "$f")"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
   done
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/business_rules.sql
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/candidate_area.sql
   exit 0
 fi
 
@@ -31,8 +41,10 @@ trap cleanup EXIT
 export PGHOST=$SOCK PGPORT=$PORT PGDATABASE=postgres
 "$PGBIN/psql" -q -c 'create database hr' >/dev/null
 export PGDATABASE=hr
+"$PGBIN/psql" -v ON_ERROR_STOP=1 -q -c "$ROLES_SQL"
 for f in supabase/migrations/*.sql; do
   echo "→ $(basename "$f")"; "$PGBIN/psql" -v ON_ERROR_STOP=1 -q -f "$f"
 done
 "$PGBIN/psql" -v ON_ERROR_STOP=1 -f supabase/tests/business_rules.sql
+"$PGBIN/psql" -v ON_ERROR_STOP=1 -f supabase/tests/candidate_area.sql
 echo "כל המיגרציות והבדיקות עברו."
