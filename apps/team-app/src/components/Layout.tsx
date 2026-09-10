@@ -10,6 +10,7 @@ const NAV = [
   { to: '/companies', label: 'לקוחות', icon: 'companies' },
   { to: '/applications', label: 'תהליכי גיוס', icon: 'applications' },
   { to: '/placements', label: 'השמות', icon: 'placements' },
+  { to: '/settlements', label: 'התחשבנות', icon: 'placements' },
   { to: '/reports', label: 'דוחות', icon: 'reports' },
   { to: '/tasks', label: 'משימות', icon: 'tasks' },
   { to: '/calendar', label: 'לוח שנה', icon: 'calendar' },

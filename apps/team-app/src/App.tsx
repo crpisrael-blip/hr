@@ -21,6 +21,7 @@ import Placements from './pages/Placements';
 import PlacementNew from './pages/PlacementNew';
 import PlacementDetail from './pages/PlacementDetail';
 import Reports from './pages/Reports';
+import Settlements from './pages/Settlements';
 import Settings from './pages/Settings';
 import Soon from './pages/Soon';
 
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/placements/new" element={<PlacementNew />} />
         <Route path="/placements/:id" element={<PlacementDetail />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/settlements" element={<Settlements />} />
         <Route path="/calendar" element={<Soon title="לוח שנה" />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
