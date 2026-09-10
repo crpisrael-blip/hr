@@ -57,15 +57,26 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "missing_fields" }), { status: 422, headers });
   }
 
+  // מפתח שירות: תומך בפורמט המפתחות החדש (sb_secret_ דרך SERVICE_ROLE_KEY)
+  // עם נפילה חזרה למפתח ה-service_role הישן שמוזרק אוטומטית.
+  const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceKey) {
+    console.error("apply: missing service key (SERVICE_ROLE_KEY / SUPABASE_SERVICE_ROLE_KEY)");
+    return new Response(JSON.stringify({ error: "server_misconfigured" }), { status: 500, headers });
+  }
   const db = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    serviceKey,
     { db: { schema: "app" }, auth: { persistSession: false } },
   );
 
   // המשרה חייבת להיות מפורסמת. אין חשיפת מידע על קיום מאגר למבקר.
-  const { data: pub } = await db.from("job_publications")
+  const { data: pub, error: pubErr } = await db.from("job_publications")
     .select("job_id, status").eq("slug", slug).maybeSingle();
+  if (pubErr) {
+    console.error("apply: job_publications read failed:", pubErr.message);
+    return new Response(JSON.stringify({ error: "server_error" }), { status: 500, headers });
+  }
   if (!pub || pub.status !== "published") {
     return new Response(JSON.stringify({ error: "job_unavailable" }), { status: 404, headers });
   }
