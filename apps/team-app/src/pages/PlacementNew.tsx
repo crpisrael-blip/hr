@@ -53,7 +53,13 @@ export default function PlacementNew() {
       p_agreed_salary: Number(salary), p_expected_start: startDate,
     });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) {
+      // כבר קיימת השמה למועמדות זו (unique על application_id).
+      if (error.code === '23505' || /placements_application_id_key/.test(error.message)) {
+        setErr('כבר קיימת השמה למועמדות זו. אפשר לצפות בה דרך מסך ההשמות.');
+      } else setErr(error.message);
+      return;
+    }
     nav(`/placements/${data}`);
   }
 
