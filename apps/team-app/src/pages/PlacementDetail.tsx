@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase, fin } from '../lib/supabase';
+import { supabase, fin, enrichPlacements } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { PLACEMENT_STATUS, INVOICE_STATUS, COMMISSION_BASE, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
@@ -14,12 +14,11 @@ export default function PlacementDetail() {
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
 
   async function load() {
-    const r = await fin.from('placements')
-      .select('*, companies(name), applications(candidates(full_name), jobs(title))')
-      .eq('id', id).maybeSingle();
+    const r = await fin.from('placements').select('*').eq('id', id).maybeSingle();
     if (r.error) { setErr(r.error.message); return; }
     if (!r.data) { setErr('ההשמה לא נמצאה'); return; }
-    setP(r.data);
+    const [enriched] = await enrichPlacements([r.data as any]);
+    setP(enriched);
     const sched = await fin.from('payment_schedules').select('id').eq('placement_id', id).maybeSingle();
     if (sched.data) {
       const inv = await fin.from('invoices').select('*').eq('schedule_id', sched.data.id).order('seq');
@@ -54,8 +53,8 @@ export default function PlacementDetail() {
 
   return (
     <>
-      <PageHead title={p.applications?.candidates?.full_name ?? 'השמה'}
-        sub={`${p.applications?.jobs?.title ?? ''} · ${p.companies?.name ?? ''}`} />
+      <PageHead title={p.candidateName ?? 'השמה'}
+        sub={`${p.jobTitle ?? ''} · ${p.companyName ?? ''}`} />
       {err && <p className="msg err">{err}</p>}
       <div className="grid2">
         <div className="card" style={{ padding: 20 }}>

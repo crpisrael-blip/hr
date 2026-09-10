@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { supabase, fin } from '../lib/supabase';
+import { supabase, fin, enrichPlacements, applicantInfo, employeeNames } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { money, formatDate, PLACEMENT_STATUS } from '../lib/format';
 import PageHead from '../components/PageHead';
@@ -10,15 +10,22 @@ const BSTATUS: Record<string,string> = { draft:'טיוטה', review:'לבדיק�
 export default function Settlements() {
   const { employee } = useAuth();
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
+  const [section, setSection] = useState<'settlements'>('settlements');
   const [tab, setTab] = useState<'monthly'|'plans'|'clawbacks'>('monthly');
   const [emps, setEmps] = useState<any[]>([]);
   useEffect(() => { supabase.from('employees').select('id, full_name').eq('employment_status','active').order('full_name').then(r=>{ if(!r.error) setEmps(r.data); }); }, []);
 
-  if (!isMgr) return <><PageHead title="התחשבנות" /><p className="msg err">מסך ההתחשבנות פתוח למנהלת בלבד.</p></>;
+  if (!isMgr) return <><PageHead title="כספים" /><p className="msg err">מסך הכספים פתוח למנהלת בלבד.</p></>;
 
   return (
     <>
-      <PageHead title="התחשבנות ובונוסים" sub="חישוב בונוסים חודשי, תוכניות תגמול וקיזוזים" />
+      <PageHead title="כספים" sub="התחשבנות, חיובים ותקבולים" />
+      <div className="submenu">
+        <button className={section==='settlements'?'on':''} onClick={()=>setSection('settlements')}>התחשבנות</button>
+        <button className="soon" disabled title="בקרוב">חיובים</button>
+        <button className="soon" disabled title="בקרוב">תקבולים</button>
+      </div>
+      {section==='settlements' && <>
       <div className="tabs">
         <button className={tab==='monthly'?'on':''} onClick={()=>setTab('monthly')}>בונוס חודשי</button>
         <button className={tab==='plans'?'on':''} onClick={()=>setTab('plans')}>תוכניות תגמול</button>
@@ -27,7 +34,12 @@ export default function Settlements() {
       {tab==='monthly' && <Monthly emps={emps} />}
       {tab==='plans' && <Plans emps={emps} />}
       {tab==='clawbacks' && <Clawbacks />}
+      </>}
       <style>{`
+        .submenu { display:flex; gap:6px; margin-bottom:14px; }
+        .submenu button { background:var(--sunk); border:1px solid var(--line); border-radius:999px; padding:7px 16px; cursor:pointer; color:var(--ink-mid); font-weight:600; font-size:.9rem; }
+        .submenu button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+        .submenu button.soon { opacity:.5; cursor:default; }
         .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line); }
         .tabs button { background:none; border:none; padding:10px 14px; cursor:pointer; color:var(--ink-mid); font-weight:600; border-bottom:2px solid transparent; }
         .tabs button.on { color:var(--brand-ink); border-bottom-color:var(--accent); }
@@ -50,8 +62,20 @@ function Monthly({ emps }: { emps: any[] }) {
     const c = await fin.from('bonus_calculations').select('*').eq('employee_id', emp).eq('period_month', m0).maybeSingle();
     setCalc(c.data ?? null);
     if (c.data) {
-      const l = await fin.from('bonus_calculation_lines').select('*, placements(applications(candidates(full_name)))').eq('calculation_id', c.data.id);
-      if (!l.error) setLines(l.data);
+      const l = await fin.from('bonus_calculation_lines').select('*').eq('calculation_id', c.data.id);
+      if (!l.error) {
+        const rows = l.data as any[];
+        // פתרון שם מועמד לכל שורה לפי ההשמה (חוצה-סכמה).
+        const plIds = [...new Set(rows.map(x => x.placement_id).filter(Boolean))];
+        let nameByPl: Record<string, string | null> = {};
+        if (plIds.length) {
+          const pls = await fin.from('placements').select('id, application_id').in('id', plIds);
+          const appInfo = await applicantInfo((pls.data || []).map((p: any) => p.application_id));
+          const plApp = Object.fromEntries((pls.data || []).map((p: any) => [p.id, p.application_id]));
+          nameByPl = Object.fromEntries(plIds.map(id => [id, appInfo[plApp[id]]?.candidateName ?? null]));
+        }
+        setLines(rows.map(x => ({ ...x, _cand: x.placement_id ? nameByPl[x.placement_id] : null })));
+      }
     } else setLines([]);
   }
   useEffect(() => { loadCalc(); }, [emp, month]);
@@ -94,7 +118,7 @@ function Monthly({ emps }: { emps: any[] }) {
             <thead><tr><th>מקור</th><th>מדרגה</th><th>אחוז</th><th>בסיס</th><th>סכום</th></tr></thead>
             <tbody>{lines.map(l=>(
               <tr key={l.id}>
-                <td>{l.placement_id ? (l.placements?.applications?.candidates?.full_name ?? 'השמה') : (l.note ?? 'קיזוז')}</td>
+                <td>{l.placement_id ? (l._cand ?? 'השמה') : (l.note ?? 'קיזוז')}</td>
                 <td className="num">{l.tier ?? '—'}</td><td className="num">{l.pct != null ? l.pct+'%' : '—'}</td>
                 <td className="num">{l.expected_commission != null ? money(Number(l.expected_commission)) : '—'}</td>
                 <td className="num" style={{ color: Number(l.amount)<0 ? 'var(--warn)' : 'inherit' }}>{money(Number(l.amount))}</td>
@@ -112,7 +136,8 @@ function Plans({ emps }: { emps: any[] }) {
   const [f, setF] = useState({ employee_id:'', metric:'placements_count', target_a:'2', target_b:'4', pct_tier_1:'5', pct_tier_2:'8' });
   const [err, setErr] = useState('');
   const set=(k:string,v:string)=>setF(s=>({...s,[k]:v}));
-  async function load(){ const r=await fin.from('bonus_plans').select('*, employees(full_name)').order('valid_from',{ascending:false}); if(!r.error) setRows(r.data); }
+  const empMap = Object.fromEntries(emps.map(e=>[e.id, e.full_name]));
+  async function load(){ const r=await fin.from('bonus_plans').select('*').order('valid_from',{ascending:false}); if(!r.error) setRows(r.data); }
   useEffect(()=>{ load(); },[]);
   async function add(e: FormEvent){
     e.preventDefault(); setErr('');
@@ -141,7 +166,7 @@ function Plans({ emps }: { emps: any[] }) {
       <table>
         <thead><tr><th>מגייס</th><th>גרסה</th><th>מדד</th><th>יעדים</th><th>אחוזים</th><th>מתאריך</th></tr></thead>
         <tbody>{rows.map(r=>(
-          <tr key={r.id}><td style={{fontWeight:600}}>{r.employees?.full_name}</td><td className="num">{r.version}</td>
+          <tr key={r.id}><td style={{fontWeight:600}}>{empMap[r.employee_id] ?? '—'}</td><td className="num">{r.version}</td>
             <td>{METRIC[r.metric]}</td><td className="num">{r.target_a} / {r.target_b}</td>
             <td className="num">{r.pct_tier_1}% · {r.pct_tier_2}%</td><td className="num">{formatDate(r.valid_from)}</td></tr>
         ))}</tbody>
@@ -155,11 +180,24 @@ function Clawbacks() {
   const [err, setErr] = useState('');
   async function load() {
     const [p, c] = await Promise.all([
-      fin.from('placements').select('id, ended_reason, status, expected_commission, applications(candidates(full_name))')
+      fin.from('placements').select('id, ended_reason, status, expected_commission, application_id')
         .in('status', ['left_in_warranty','not_started','cancelled']),
-      fin.from('clawback_proposals').select('*, employees(full_name), placements(applications(candidates(full_name)))').order('created_at',{ascending:false}),
+      fin.from('clawback_proposals').select('*').order('created_at',{ascending:false}),
     ]);
-    if (!p.error) setFailed(p.data); if (!c.error) setProps(c.data);
+    if (!p.error) setFailed(await enrichPlacements(p.data as any));
+    if (!c.error) {
+      const cbs = c.data as any[];
+      const empMap = await employeeNames(cbs.map(x => x.employee_id));
+      const plIds = [...new Set(cbs.map(x => x.placement_id).filter(Boolean))];
+      let candByPl: Record<string, string | null> = {};
+      if (plIds.length) {
+        const pls = await fin.from('placements').select('id, application_id').in('id', plIds);
+        const appInfo = await applicantInfo((pls.data || []).map((p: any) => p.application_id));
+        const plApp = Object.fromEntries((pls.data || []).map((p: any) => [p.id, p.application_id]));
+        candByPl = Object.fromEntries(plIds.map(id => [id, appInfo[plApp[id]]?.candidateName ?? null]));
+      }
+      setProps(cbs.map(x => ({ ...x, _emp: empMap[x.employee_id] ?? null, _cand: x.placement_id ? candByPl[x.placement_id] : null })));
+    }
   }
   useEffect(()=>{ load(); },[]);
   const openFor = (pid: string) => props.find(x=>x.placement_id===pid);
@@ -183,7 +221,7 @@ function Clawbacks() {
         {failed.length===0 ? <p className="empty">אין השמות שנכשלו.</p> : (
           <table><thead><tr><th>מועמד</th><th>מצב</th><th>עמלה צפויה</th><th></th></tr></thead><tbody>
             {failed.map(p=>{ const cb=openFor(p.id); return (
-              <tr key={p.id}><td style={{fontWeight:600}}>{p.applications?.candidates?.full_name ?? '—'}</td>
+              <tr key={p.id}><td style={{fontWeight:600}}>{p.candidateName ?? '—'}</td>
                 <td><span className="tag mute">{PLACEMENT_STATUS[p.status]}</span></td>
                 <td className="num">{money(Number(p.expected_commission))}</td>
                 <td>{cb ? <span className="tag">{cb.status==='closed'?'טופל':'הצעה פתוחה'}</span> : <button className="btn btn-quiet btn-sm" onClick={()=>open(p.id)}>פתח הצעת קיזוז</button>}</td></tr>
@@ -196,8 +234,8 @@ function Clawbacks() {
         {props.length===0 ? <p className="empty">אין הצעות קיזוז.</p> : (
           <table><thead><tr><th>מועמד</th><th>מגייס</th><th>מוצע</th><th>מצב</th><th></th></tr></thead><tbody>
             {props.map(cb=>(
-              <tr key={cb.id}><td>{cb.placements?.applications?.candidates?.full_name ?? '—'}</td>
-                <td>{cb.employees?.full_name}</td><td className="num">{money(Number(cb.proposed_amount))}</td>
+              <tr key={cb.id}><td>{cb._cand ?? '—'}</td>
+                <td>{cb._emp ?? '—'}</td><td className="num">{money(Number(cb.proposed_amount))}</td>
                 <td><span className={'tag '+(cb.status==='closed'?'ok':'warn')}>{cb.status==='open'?'פתוחה':cb.status==='decided'?'הוחלט':'סגורה'}</span></td>
                 <td>{cb.status==='open' && <button className="btn btn-primary btn-sm" onClick={()=>decide(cb)}>החלטה</button>}</td></tr>
             ))}

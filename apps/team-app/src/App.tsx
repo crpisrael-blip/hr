@@ -64,7 +64,8 @@ export default function App() {
         <Route path="/placements/new" element={<PlacementNew />} />
         <Route path="/placements/:id" element={<PlacementDetail />} />
         <Route path="/reports" element={<Reports />} />
-        <Route path="/settlements" element={<Settlements />} />
+        <Route path="/finance" element={<Settlements />} />
+        <Route path="/settlements" element={<Navigate to="/finance" replace />} />
         <Route path="/calendar" element={<Soon title="לוח שנה" />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
