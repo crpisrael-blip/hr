@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { APP_STAGE } from '../lib/format';
 import PageHead from '../components/PageHead';
 
 const ROLE: Record<string,string> = { recruiter:'מגייס', manager:'מנהלת החברה', superadmin:'מנהל על' };
@@ -61,16 +62,18 @@ export default function Settings() {
       {tab==='stages' && (
         <div className="card" style={{ overflow: 'hidden' }}>
           <table>
-            <thead><tr><th>שלב פנימי</th><th>נחשף למועמד</th><th>תווית למועמד</th></tr></thead>
+            <thead><tr><th>שלב פנימי</th><th>נחשף למועמד</th><th>תווית למועמד</th><th>טקסט הסבר</th><th>מה המועמד רואה</th></tr></thead>
             <tbody>{stages.map(s => (
               <tr key={s.stage}>
-                <td style={{ fontWeight: 600 }}>{s.stage}</td>
+                <td style={{ fontWeight: 600 }}>{APP_STAGE[s.stage] ?? s.stage}<div className="hint" dir="ltr" style={{ textAlign:'start' }}>{s.stage}</div></td>
                 <td><input type="checkbox" checked={s.exposed} onChange={e=>saveStage(s.stage, { exposed: e.target.checked })} style={{ width:'auto', minHeight:0 }} /></td>
-                <td><input defaultValue={s.candidate_label ?? ''} onBlur={e=>saveStage(s.stage, { candidate_label: e.target.value || null })} placeholder="—" style={{ minHeight: 32 }} /></td>
+                <td><input defaultValue={s.candidate_label ?? ''} disabled={!s.exposed} onBlur={e=>saveStage(s.stage, { candidate_label: e.target.value || null })} placeholder="—" style={{ minHeight: 32 }} /></td>
+                <td><input defaultValue={s.explanation ?? ''} disabled={!s.exposed} onBlur={e=>saveStage(s.stage, { explanation: e.target.value || null })} placeholder="—" style={{ minHeight: 32 }} /></td>
+                <td><span className={'tag '+(s.exposed?'brand':'mute')}>{s.exposed ? (s.candidate_label || 'בתהליך') : 'בטיפול'}</span></td>
               </tr>
             ))}</tbody>
           </table>
-          <p className="hint" style={{ padding: 14 }}>מה שמוגדר כאן קובע מה מועמד רואה באזור האישי. שינוי נכנס לתוקף מיד.</p>
+          <p className="hint" style={{ padding: 14 }}>מה שמוגדר כאן קובע מה מועמד רואה באזור האישי. שלב שאינו "נחשף" מוצג למועמד תמיד כ"בטיפול", והשם הפנימי לעולם אינו מגיע אליו. שינוי נכנס לתוקף מיד.</p>
         </div>
       )}
       <style>{`
