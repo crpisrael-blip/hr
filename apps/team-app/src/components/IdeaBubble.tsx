@@ -52,6 +52,7 @@ export default function IdeaBubble() {
   const [busy, setBusy] = useState(false);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [copied, setCopied] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   const drag = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
 
@@ -81,7 +82,7 @@ export default function IdeaBubble() {
   const load = useCallback(async () => {
     const { data } = await supabase.from('dev_ideas')
       .select('id, kind, body, context, status, created_at')
-      .order('created_at', { ascending: false }).limit(100);
+      .order('created_at', { ascending: false }).limit(200);
     if (data) setIdeas(data as Idea[]);
   }, []);
 
@@ -91,7 +92,6 @@ export default function IdeaBubble() {
     const text = body.trim();
     if (!text) return;
     setBusy(true);
-    // ההקשר: המסך + תצורת המכשיר (נייד/נייח).
     const context = `${screenLabel(pathname)} · ${deviceType()}`;
     const { error } = await supabase.from('dev_ideas').insert({ kind, body: text, context });
     setBusy(false);
@@ -122,7 +122,27 @@ export default function IdeaBubble() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
   }
 
-  const activeCount = ideas.filter(i => i.status !== 'done').length;
+  const active = ideas.filter(i => i.status !== 'done');
+  const done = ideas.filter(i => i.status === 'done');
+
+  const renderItem = (i: Idea) => (
+    <li key={i.id} className={'ib-item st-' + i.status}>
+      <div className="ib-item-top">
+        <span className="ib-chip" title={KMAP[i.kind].label}>{KMAP[i.kind].icon}</span>
+        <p className="ib-body">{i.body}</p>
+      </div>
+      <div className="ib-meta">
+        <span className="ib-ctx">{i.context ?? '—'}</span>
+        <span className="ib-row-actions">
+          <button className={i.status === 'in_progress' ? 'on' : ''} title="בעבודה" aria-label="בעבודה"
+            onClick={() => toggle(i, 'in_progress')}>⏳</button>
+          <button className={i.status === 'done' ? 'on' : ''} title={i.status === 'done' ? 'החזרה לפתוח' : 'טופל'}
+            aria-label="טופל" onClick={() => toggle(i, 'done')}>✓</button>
+          <button title="מחיקה" aria-label="מחיקה" onClick={() => remove(i.id)}>🗑</button>
+        </span>
+      </div>
+    </li>
+  );
 
   // מיקום חכם: התיבה נפתחת תמיד לתוך המסך, לא נחתכת בקצוות.
   const vw = window.innerWidth, vh = window.innerHeight;
@@ -137,11 +157,14 @@ export default function IdeaBubble() {
         <div className="ib-panel" role="dialog" aria-label="בועת הרעיונות"
           style={{ position: 'fixed', left: panelLeft, width: PW, ...panelPos }}>
           <div className="ib-head">
-            <strong>לכידה מהירה</strong>
-            <button className="ib-x" onClick={() => setOpen(false)} aria-label="סגירה" title="סגירה">×</button>
+            <strong>בועת הרעיונות 💡</strong>
+            <span className="ib-head-actions">
+              <button className="ib-icon ib-copy" onClick={copyForLLM} disabled={!active.length}
+                title="העתקה ל-LLM" aria-label="העתקה ל-LLM">{copied ? '✓' : '📋'}</button>
+              <button className="ib-x" onClick={() => setOpen(false)} aria-label="סגירה" title="סגירה">×</button>
+            </span>
           </div>
 
-          {/* אייקוני סוג בשורה נפרדת */}
           <div className="ib-kinds">
             {KINDS.map(x => (
               <button key={x.k} className={'ib-kind' + (kind === x.k ? ' on' : '')} onClick={() => setKind(x.k)}
@@ -151,43 +174,29 @@ export default function IdeaBubble() {
             ))}
           </div>
 
-          {/* שדה הרישום — שורה מלאה מתחת לאייקונים, יותר מקום */}
           <textarea className="ib-ta" value={body} onChange={e => setBody(e.target.value)} autoFocus rows={3}
             placeholder={`${KMAP[kind].label}…`}
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save(); }} />
           <div className="ib-actions">
             <span className="ib-hint">Ctrl/⌘ + Enter</span>
-            <button className="ib-icon ib-save" onClick={save} disabled={busy || !body.trim()}
-              title="שמירה" aria-label="שמירה">{busy ? '…' : '＋'}</button>
+            <button className="ib-add" onClick={save} disabled={busy || !body.trim()}>{busy ? '…' : 'הוסף'}</button>
           </div>
 
-          <div className="ib-list-head">
-            <span>{activeCount} פעילים</span>
-            <button className="ib-icon ib-copy" onClick={copyForLLM} disabled={!activeCount}
-              title="העתקה ל-LLM" aria-label="העתקה ל-LLM">{copied ? '✓' : '📋'}</button>
-          </div>
-
+          <div className="ib-list-head"><span>פעילים ({active.length})</span></div>
           <ul className="ib-list">
-            {ideas.length === 0 && <li className="ib-empty">עדיין אין לכידות. כל מחשבה — לחיצה אחת.</li>}
-            {ideas.map(i => (
-              <li key={i.id} className={'ib-item st-' + i.status}>
-                <div className="ib-item-top">
-                  <span className="ib-chip" title={KMAP[i.kind].label}>{KMAP[i.kind].icon}</span>
-                  <p className="ib-body">{i.body}</p>
-                </div>
-                <div className="ib-meta">
-                  <span className="ib-ctx">{i.context ?? '—'}</span>
-                  <span className="ib-row-actions">
-                    <button className={i.status === 'in_progress' ? 'on' : ''} title="בעבודה" aria-label="בעבודה"
-                      onClick={() => toggle(i, 'in_progress')}>⏳</button>
-                    <button className={i.status === 'done' ? 'on' : ''} title="טופל" aria-label="טופל"
-                      onClick={() => toggle(i, 'done')}>✓</button>
-                    <button title="מחיקה" aria-label="מחיקה" onClick={() => remove(i.id)}>🗑</button>
-                  </span>
-                </div>
-              </li>
-            ))}
+            {active.length === 0 && <li className="ib-empty">אין פריטים פעילים. כל מחשבה — לחיצה אחת.</li>}
+            {active.map(renderItem)}
           </ul>
+
+          {done.length > 0 && (
+            <div className="ib-done">
+              <button className="ib-done-toggle" onClick={() => setShowDone(s => !s)} aria-expanded={showDone}>
+                <span>נסגרו ({done.length})</span>
+                <span aria-hidden="true">{showDone ? '▾' : '◂'}</span>
+              </button>
+              {showDone && <ul className="ib-list ib-done-list">{done.map(renderItem)}</ul>}
+            </div>
+          )}
         </div>
       )}
 
@@ -195,7 +204,7 @@ export default function IdeaBubble() {
         style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9001 }}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         title="בועת הרעיונות — גררו להזזה, לחיצה ללכידה" aria-label="בועת הרעיונות">
-        💡{activeCount > 0 && <span className="ib-badge">{activeCount}</span>}
+        💡{active.length > 0 && <span className="ib-badge">{active.length}</span>}
       </button>
 
       <style>{`
@@ -212,10 +221,11 @@ export default function IdeaBubble() {
 
         .ib-panel { z-index: 9002; background: #fff; color: #0d1230; border: 1px solid #e7edf8; border-radius: 14px;
           box-shadow: 0 20px 50px #12225026; padding: 10px; font-family: 'Heebo', system-ui, sans-serif;
-          display: flex; flex-direction: column; gap: 8px; max-height: min(74vh, 540px); }
+          display: flex; flex-direction: column; gap: 8px; max-height: min(76vh, 560px); }
         .ib-head { display: flex; justify-content: space-between; align-items: center; }
-        .ib-head strong { font-size: .92rem; color: #080838; }
-        .ib-x { border: 0; background: #f2f4f9; width: 24px; height: 24px; border-radius: 7px; font-size: 16px;
+        .ib-head strong { font-size: .95rem; color: #080838; }
+        .ib-head-actions { display: flex; gap: 6px; }
+        .ib-x { border: 0; background: #f2f4f9; width: 30px; height: 30px; border-radius: 8px; font-size: 17px;
           color: #4a5578; cursor: pointer; line-height: 1; }
 
         .ib-kinds { display: flex; align-items: center; gap: 6px; }
@@ -228,24 +238,23 @@ export default function IdeaBubble() {
         .ib-ta:focus { outline: none; border-color: #90c0f8; background: #fff; }
         .ib-actions { display: flex; align-items: center; justify-content: space-between; }
         .ib-hint { color: #7d87a6; font-size: .72rem; }
+        .ib-add { border: 0; border-radius: 10px; padding: 9px 22px; font: inherit; font-weight: 700; font-size: .95rem;
+          color: #fff; cursor: pointer; background: linear-gradient(120deg, #080838, #171763); }
+        .ib-add:disabled { opacity: .45; cursor: default; }
 
-        .ib-icon { width: 34px; height: 34px; border-radius: 9px; border: 0; cursor: pointer;
+        .ib-icon { width: 30px; height: 30px; border-radius: 8px; border: 0; cursor: pointer; font-size: 15px;
           display: grid; place-items: center; flex: 0 0 auto; padding: 0; }
-        .ib-save { background: linear-gradient(120deg, #080838, #171763); color: #fff; font-size: 21px; font-weight: 700; }
-        .ib-save:disabled { opacity: .45; cursor: default; }
-        .ib-copy { border: 1px solid #90c0f8; background: #dcebfd; color: #080838; font-size: 15px; }
+        .ib-copy { border: 1px solid #90c0f8; background: #dcebfd; color: #080838; }
         .ib-copy:disabled { opacity: .45; cursor: default; }
 
-        .ib-list-head { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #eef2fa;
-          padding-top: 8px; font-size: .78rem; color: #4a5578; }
-
+        .ib-list-head { border-top: 1px solid #eef2fa; padding-top: 8px; font-size: .78rem; color: #4a5578; }
         .ib-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .ib-empty { color: #7d87a6; font-size: .82rem; text-align: center; padding: 12px 4px; }
         .ib-item { border: 1px solid #eef2fa; border-radius: 10px; padding: 7px 9px; background: #fff;
           border-inline-start: 3px solid #e7edf8; }
         .ib-item.st-in_progress { border-inline-start-color: #e6a700; background: #fffdf5; }
-        .ib-item.st-done { opacity: .5; border-inline-start-color: #0f9d6b; }
-        .ib-item.st-done .ib-body { text-decoration: line-through; }
+        .ib-item.st-done { border-inline-start-color: #0f9d6b; }
+        .ib-item.st-done .ib-body { text-decoration: line-through; color: #7d87a6; }
         .ib-item-top { display: flex; gap: 7px; align-items: flex-start; }
         .ib-chip { font-size: 15px; line-height: 1.4; flex: 0 0 auto; }
         .ib-body { margin: 0; font-size: .88rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
@@ -256,6 +265,13 @@ export default function IdeaBubble() {
           color: #4a5578; font-size: 13px; line-height: 1; display: grid; place-items: center; padding: 0; }
         .ib-row-actions button:hover { background: #dcebfd; }
         .ib-row-actions button.on { background: #90c0f8; color: #080838; }
+
+        .ib-done { border-top: 1px solid #eef2fa; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .ib-done-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0;
+          background: #f4f8ff; border-radius: 9px; padding: 8px 11px; font: inherit; font-size: .82rem; font-weight: 600;
+          color: #4a5578; cursor: pointer; }
+        .ib-done-toggle:hover { background: #eef2fa; }
+        .ib-done-list { opacity: .78; }
       `}</style>
     </div>
   );
