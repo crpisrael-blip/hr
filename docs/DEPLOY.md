@@ -24,11 +24,19 @@
    ```sql
    select app.link_employee('EMAIL', 'שם מלא', 'manager');
    ```
-3. **אחסון מסמכים.** מיגרציה `0011` יוצרת אוטומטית דלי פרטי בשם
-   `candidate-docs` ואת מדיניות הגישה (מועמד רואה רק את שלו, צוות רואה הכול).
-   אין צורך ליצור אותו ידנית.
-4. **חשיפת סכמות ל-Data API.** לוודא ש-`app` ו-`finance` חשופות
-   (Project Settings → Data API → Exposed schemas).
+3. **אחסון מסמכים.** המיגרציות יוצרות אוטומטית דליים פרטיים:
+   `candidate-docs` (מסמכי מועמד), `employee-docs` (מסמכי עובד, 0013),
+   `form-uploads` (קבצי טפסים, 0015). אין צורך ליצור ידנית.
+4. **חשיפת סכמות ל-Data API.** לוודא ש-`app` **ו-`finance`** חשופות
+   (Project Settings → Data API → Exposed schemas). בלי `finance` מודול
+   הכספים/השמות ייכשל.
+5. **הרשאות service_role.** מיגרציה `0014` מעניקה ל-`service_role` גישה
+   לסכמות `app`/`finance` — חובה כדי שפונקציות הקצה (`apply`, `invite-employee`)
+   יעבדו. סוד `SERVICE_ROLE_KEY` (המפתח הסודי החדש `sb_secret_…`) חייב להיות
+   מוגדר ב-Edge Functions → Secrets.
+6. **פונקציית הזמנת עובד.** לפרוס את `invite-employee` (כמו `apply`), ולהוסיף
+   את `https://hr-app.ort-tech.co.il` ל-Redirect URLs. תבנית "Invite user" נשלחת
+   דרך Resend (מצריך דומיין מאומת לשליחה לכל כתובת).
 
 ### אימות כניסה לאזור האישי
 

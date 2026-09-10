@@ -23,6 +23,7 @@ const NAV = [
   { to: '/reports', label: 'דוחות', icon: 'reports' },
   { to: '/tasks', label: 'משימות', icon: 'tasks' },
   { to: '/employees', label: 'מגייסים', icon: 'candidates' },
+  { to: '/forms', label: 'טפסים', icon: 'reports' },
   { to: '/calendar', label: 'לוח שנה', icon: 'calendar' },
   { to: '/settings', label: 'הגדרות', icon: 'settings' },
 ];
