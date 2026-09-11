@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /apply/
-
-Sitemap: https://hr.ort-tech.co.il/sitemap.xml

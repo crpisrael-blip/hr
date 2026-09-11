@@ -1,0 +1,22 @@
+# בעלות על קוד — מי חייב לאשר PR באילו נתיבים.
+# החליפו את @OWNER בשם המשתמש/צוות ב-GitHub לפני הפעלת branch protection,
+# אחרת הכלל לא יתפוס ולא יתווסף שום reviewer אוטומטית.
+
+# ברירת מחדל לכל הריפו
+*                           @OWNER
+
+# סכימה, RLS ופונקציות קצה — נקודת האמת של כללי העסק והאבטחה
+/supabase/                  @OWNER
+
+# תשתית, CI ופריסה
+/.github/                   @OWNER
+/scripts/                   @OWNER
+/wrangler.toml              @OWNER
+/apps/*/wrangler.toml       @OWNER
+/package.json               @OWNER
+/package-lock.json          @OWNER
+
+# תיעוד ואפיון
+/docs/                      @OWNER
+/README.md                  @OWNER
+/CHANGELOG.md               @OWNER

@@ -2,18 +2,24 @@
 import Base from '../layouts/Base.astro';
 import JobCard from '../components/JobCard.astro';
 import { loadJobs } from '../data/jobs';
+import { SITE } from '../data/site';
 const jobs = await loadJobs();
 const latest = jobs.slice(0, 6);
+const origin = new URL('/', Astro.site).href;
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'URSA GROUP',
-  url: 'https://hr.ort-tech.co.il',
+  name: SITE.shortName,
+  url: origin,
   description: 'משרדי גיוס והשמה',
+  logo: new URL('/ursa-logo.png', Astro.site).href,
+  image: new URL('/og-default.png', Astro.site).href,
+  email: SITE.email,
+  ...(SITE.sameAs.length ? { sameAs: SITE.sameAs } : {}),
 };
 ---
 <Base
-  title="URSA GROUP — משרות גיוס והשמה"
+  title={`${SITE.shortName} — משרות גיוס והשמה`}
   description="מאגר משרות פתוחות ממעסיקים מובילים. הגישו מועמדות בקלות, וצוות הגיוס שלנו ילווה אתכם עד ההשמה."
   jsonLd={jsonLd}>
   <section class="hero">
@@ -22,7 +28,7 @@ const jsonLd = {
       <h1>המשרה הבאה שלכם מתחילה כאן</h1>
       <p class="lede measure">אנחנו מחברים בין מועמדים למעסיקים בתהליך אישי ומקצועי. עיינו במשרות הפתוחות, הגישו מועמדות בכמה דקות, וקבלו ליווי צמוד עד החתימה.</p>
       <div class="cta">
-        <a href="/jobs" class="btn btn-primary">עיון בכל המשרות</a>
+        <a href="/jobs/" class="btn btn-primary">עיון בכל המשרות</a>
         <a href="#latest" class="btn btn-quiet">המשרות החדשות</a>
       </div>
     </div>
@@ -31,7 +37,7 @@ const jsonLd = {
   <section id="latest" class="page latest">
     <div class="section-head">
       <h2>משרות שפורסמו לאחרונה</h2>
-      <a href="/jobs" class="more">לכל המשרות ←</a>
+      <a href="/jobs/" class="more">לכל המשרות ←</a>
     </div>
     {latest.length === 0 ? (
       <p class="empty">אין כרגע משרות פתוחות. חזרו בקרוב, אנחנו מעדכנים תדיר.</p>

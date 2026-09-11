@@ -12,7 +12,9 @@
     "astro": "^5.14.1"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@types/node": "^22.10.2",
     "postgres": "^3.4.5",
-    "wrangler": "^4.42.0"
+    "typescript": "^5.7.2"
   }
 }

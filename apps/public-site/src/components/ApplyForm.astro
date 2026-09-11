@@ -2,107 +2,216 @@
 import { SITE } from '../data/site';
 interface Props { slug: string; jobTitle: string; }
 const { slug, jobTitle } = Astro.props;
-// נקודת הקצה להגשה: פונקציית שרת נפרדת, כתיבה בלבד. אין למסד גישה ישירה מהדפדפן.
-const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
+
+// נקודת הקצה להגשה: פונקציית שרת נפרדת, כתיבה בלבד. אין למסד גישה ישירה
+// מהדפדפן. בבניית ייצור (CI/CF_PAGES) astro.config מפיל את הבנייה אם
+// המשתנה חסר, ולכן כאן הוא יכול להיות ריק רק בפיתוח מקומי (K2).
+const endpoint = (import.meta.env.PUBLIC_APPLY_ENDPOINT as string | undefined)?.trim() ?? '';
+const isDev = import.meta.env.DEV;
+// מצב הדגמה קיים בפיתוח בלבד. בכל בנייה אחרת בלי נקודת קצה מוצגת הודעה
+// כנה במקום טופס — ולעולם לא "ההגשה התקבלה" מזויף.
+const demo = !endpoint && isDev;
+const unavailable = !endpoint && !isDev;
 ---
-<form class="apply" data-endpoint={endpoint} data-slug={slug} novalidate>
-  <input type="hidden" name="slug" value={slug} />
-  <!-- מלכודת בוטים. בני אדם לא ממלאים שדה מוסתר. -->
-  <input type="text" name="company_website" tabindex="-1" autocomplete="off" class="visually-hidden" aria-hidden="true" />
-
-  <div class="field">
-    <label class="label" for="full_name">שם מלא <span class="req">*</span></label>
-    <input type="text" id="full_name" name="full_name" required autocomplete="name" />
+{unavailable ? (
+  <div class="apply-unavailable" role="alert">
+    <p><strong>טופס ההגשה אינו זמין כרגע.</strong></p>
+    <p>האתר נבנה בלי הגדרת נקודת הקצה להגשה (<code>PUBLIC_APPLY_ENDPOINT</code>).
+      כדי להגיש מועמדות למשרת {jobTitle} אפשר לפנות אלינו ישירות בדוא״ל
+      <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
   </div>
+) : (
+  <form
+    class="apply"
+    method="post"
+    action={endpoint || undefined}
+    enctype="multipart/form-data"
+    data-endpoint={endpoint}
+    data-demo={demo ? 'true' : undefined}
+    data-slug={slug}
+    novalidate
+  >
+    <input type="hidden" name="slug" value={slug} />
+    <!-- מלכודת בוטים. בני אדם לא ממלאים שדה מוסתר. -->
+    <input type="text" name="company_website" tabindex="-1" autocomplete="off" class="visually-hidden" aria-hidden="true" />
 
-  <div class="field">
-    <label class="label" for="phone">טלפון <span class="req">*</span></label>
-    <input type="tel" id="phone" name="phone" required inputmode="tel"
-           autocomplete="tel" pattern="[0-9+\-\s]{9,15}" placeholder="050-0000000" />
-    <span class="hint">נשתמש בטלפון כדי ליצור איתך קשר וכדי לזהות אותך באזור האישי.</span>
-  </div>
+    {demo && (
+      <p class="demo-note" role="note">מצב פיתוח מקומי: אין נקודת קצה, ההגשה לא תישלח לשום מקום.</p>
+    )}
 
-  <div class="field">
-    <label class="label" for="email">דוא״ל</label>
-    <input type="email" id="email" name="email" autocomplete="email" placeholder="לא חובה" />
-  </div>
+    <div class="field">
+      <label class="label" for="full_name">שם מלא <span class="req">*</span></label>
+      <input type="text" id="full_name" name="full_name" required autocomplete="name"
+             aria-describedby="full_name-err" />
+      <p class="field-error" id="full_name-err" hidden></p>
+    </div>
 
-  <div class="field">
-    <label class="label" for="cv">קורות חיים</label>
-    <input type="file" id="cv" name="cv" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-    <span class="hint">PDF או Word, עד 10MB. אפשר להגיש גם בלי לצרף.</span>
-  </div>
+    <div class="field">
+      <label class="label" for="phone">טלפון <span class="req">*</span></label>
+      <input type="tel" id="phone" name="phone" required inputmode="tel" dir="ltr"
+             autocomplete="tel" pattern={'[0-9+\\-\\s()]{9,15}'} placeholder="050-0000000"
+             aria-describedby="phone-hint phone-err" />
+      <span class="hint" id="phone-hint">נשתמש בטלפון כדי ליצור איתך קשר וכדי לזהות אותך באזור האישי.</span>
+      <p class="field-error" id="phone-err" hidden></p>
+    </div>
 
-  <!-- שאלות נוספות שמוגדרות מהמערכת (בנאי הטפסים). מרונדרות בזמן ריצה,
-       כך שאפשר לערוך אותן בלי לפרוס מחדש את האתר. אם אין — נשאר ריק. -->
-  <div class="extra-fields" data-extra hidden></div>
+    <div class="field">
+      <label class="label" for="email">דוא״ל</label>
+      <input type="email" id="email" name="email" autocomplete="email" dir="ltr"
+             placeholder="לא חובה" aria-describedby="email-err" />
+      <p class="field-error" id="email-err" hidden></p>
+    </div>
 
-  <label class="consent">
-    <input type="checkbox" name="consent" value="true" required />
-    <span>אני מאשר/ת שימוש בפרטים שלי לצורך תהליך הגיוס, לפי <a href="/privacy">מדיניות הפרטיות</a>.</span>
-  </label>
+    <div class="field">
+      <label class="label" for="cv">קורות חיים</label>
+      <input type="file" id="cv" name="cv"
+             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+             aria-describedby="cv-hint cv-err" />
+      <span class="hint" id="cv-hint">PDF או Word (docx) בלבד, עד 10MB. אפשר להגיש גם בלי לצרף.</span>
+      <p class="field-error" id="cv-err" hidden></p>
+    </div>
 
-  <button type="submit" class="btn btn-accent submit">שליחת מועמדות</button>
-  <p class="form-status" role="status" aria-live="polite" hidden></p>
-</form>
+    <!-- שאלות נוספות שמוגדרות מהמערכת (בנאי הטפסים). מרונדרות בזמן ריצה,
+         כך שאפשר לערוך אותן בלי לפרוס מחדש את האתר. אם אין — נשאר ריק. -->
+    <div class="extra-fields" data-extra hidden></div>
+
+    <div class="field">
+      <label class="consent" for="consent">
+        <input type="checkbox" id="consent" name="consent" value="true" required
+               aria-describedby="consent-err" />
+        <span>אני מאשר/ת שהפרטים וקורות החיים שלי ישמשו לצורך הליך הגיוס, <strong>ויועברו למעסיקים
+          שהמשרה מטעמם</strong>, בהתאם ל<a href="/privacy/">מדיניות הפרטיות</a>. <span class="req">*</span></span>
+      </label>
+      <p class="field-error" id="consent-err" hidden></p>
+    </div>
+
+    <button type="submit" class="btn btn-accent submit">שליחת מועמדות</button>
+    <p class="form-status" role="status" aria-live="polite" hidden></p>
+  </form>
+)}
 
 <script>
   const MAX_BYTES = 10 * 1024 * 1024;
+  // הפונקציה בשרת מקבלת PDF ו-docx בלבד. .doc הישן נדחה שם, ולכן נחסם כאן
+  // עם הודעה ברורה במקום העלאה של 10MB שתיפול (G2).
   const OK_TYPES = [
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
+  const OK_EXT = /\.(pdf|docx)$/i;
+  // מפתח שדה מבנאי הטפסים נכנס ל-id/name. רק תווים בטוחים (G4).
+  const KEY_RE = /^[a-z0-9_]+$/i;
+  const TEXT_INPUT_TYPES: Record<string, string> = {
+    number: 'number', date: 'date', time: 'time', email: 'email', tel: 'tel',
+  };
 
-  const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  // חוזה השגיאות של פונקציית ההגשה (G3).
+  const ERROR_TEXT: Record<string, string> = {
+    bad_request: 'הבקשה לא נקלטה כראוי. רעננו את העמוד ונסו שוב.',
+    forbidden_origin: 'ההגשה נחסמה מטעמי אבטחה. נסו מדפדפן אחר, או פנו אלינו בטלפון.',
+    job_unavailable: 'המשרה כבר אינה פתוחה להגשה.',
+    file_too_large: 'הקובץ גדול מ-10MB. נסו קובץ קטן יותר.',
+    file_type: 'אפשר לצרף קובץ PDF או Word (docx) בלבד.',
+    missing_fields: 'חסרים שדות חובה. השלימו את המסומן ונסו שוב.',
+    rate_limited: 'נשלחו יותר מדי בקשות, נסו שוב בעוד כמה דקות.',
+    server_error: 'אירעה תקלה בשרת. נסו שוב בעוד רגע, או פנו אלינו בעמוד יצירת הקשר.',
+    server_misconfigured: 'אירעה תקלה בשרת. נסו שוב בעוד רגע, או פנו אלינו בעמוד יצירת הקשר.',
+  };
+  const STATUS_CODE: Record<number, string> = {
+    400: 'bad_request', 403: 'forbidden_origin', 404: 'job_unavailable',
+    413: 'file_too_large', 415: 'file_type', 422: 'missing_fields',
+    429: 'rate_limited', 500: 'server_error',
+  };
 
-  // בונה HTML לשדה אחד לפי הגדרתו במערכת. תומך בסוגים הרלוונטיים לאתר.
-  function fieldHtml(f: any): string {
-    const id = 'x_' + f.key;
-    const req = f.required ? '<span class="req">*</span>' : '';
-    const lbl = `<label class="label" for="${id}">${esc(f.label)} ${req}</label>`;
-    const hint = f.help ? `<span class="hint">${esc(f.help)}</span>` : '';
-    const r = f.required ? 'required' : '';
-    if (f.type === 'heading') return `<h3 class="x-head">${esc(f.label)}</h3>`;
-    if (f.type === 'paragraph') return `<p class="x-para">${esc(f.label)}</p>`;
-    let control = '';
-    if (f.type === 'textarea') control = `<textarea id="${id}" name="${id}" rows="3" ${r}></textarea>`;
-    else if (f.type === 'boolean') return `<label class="consent"><input type="checkbox" id="${id}" name="${id}" value="true" ${r} /><span>${esc(f.label)}</span></label>`;
-    else if (f.type === 'select') {
-      const opts = (f.options ?? []).map((o: any) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
-      control = `<select id="${id}" name="${id}" ${r}><option value="">בחר/י…</option>${opts}</select>`;
+  const FIELD_ERROR: Record<string, string> = {
+    full_name: 'נא למלא שם מלא.',
+    phone: 'נא למלא מספר טלפון ליצירת קשר.',
+    consent: 'יש לאשר את השימוש בפרטים כדי לשלוח מועמדות.',
+  };
+
+  /** בונה שדה דינמי אחד כ-DOM. אין כאן innerHTML ואין שרשור מחרוזות (G4). */
+  function buildField(f: any): HTMLElement | null {
+    const key = String(f?.key ?? '');
+    if (!KEY_RE.test(key)) return null;
+    const type = String(f?.type ?? 'text');
+    const label = String(f?.label ?? '');
+    const id = 'x_' + key;
+
+    if (type === 'heading') {
+      const h = document.createElement('h3');
+      h.className = 'x-head';
+      h.textContent = label;
+      return h;
+    }
+    if (type === 'paragraph') {
+      const p = document.createElement('p');
+      p.className = 'x-para';
+      p.textContent = label;
+      return p;
+    }
+    if (type === 'boolean') {
+      const wrap = document.createElement('label');
+      wrap.className = 'consent';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.name = id;
+      cb.value = 'true';
+      cb.required = !!f?.required;
+      const span = document.createElement('span');
+      span.textContent = label;
+      wrap.append(cb, span);
+      return wrap;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+
+    const lab = document.createElement('label');
+    lab.className = 'label';
+    lab.htmlFor = id;
+    lab.textContent = label;
+    if (f?.required) {
+      const star = document.createElement('span');
+      star.className = 'req';
+      star.textContent = ' *';
+      lab.append(star);
+    }
+
+    let control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    if (type === 'textarea') {
+      control = document.createElement('textarea');
+      control.rows = 3;
+    } else if (type === 'select') {
+      const sel = document.createElement('select');
+      const empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = 'בחר/י…';
+      sel.append(empty);
+      for (const o of Array.isArray(f?.options) ? f.options : []) {
+        const opt = document.createElement('option');
+        opt.value = String(o?.value ?? '');
+        opt.textContent = String(o?.label ?? o?.value ?? '');
+        sel.append(opt);
+      }
+      control = sel;
     } else {
-      const t = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text';
-      control = `<input type="${t}" id="${id}" name="${id}" ${r} />`;
+      const inp = document.createElement('input');
+      inp.type = TEXT_INPUT_TYPES[type] ?? 'text';
+      control = inp;
     }
-    return `<div class="field">${lbl}${control}${hint}</div>`;
-  }
+    control.id = id;
+    control.name = id;
+    control.required = !!f?.required;
 
-  // טוען את שדות טופס ההגשה מהמערכת ומרנדר אותם. כשל אינו שובר את הטופס הבסיסי.
-  async function loadExtra(form: HTMLFormElement, box: HTMLElement) {
-    try {
-      const res = await fetch(form.dataset.endpoint!, { method: 'GET' });
-      if (!res.ok) return;
-      const data = await res.json();
-      const fields = (data?.fields ?? []).slice().sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-      if (!fields.length) return;
-      box.innerHTML = fields.map(fieldHtml).join('');
-      box.dataset.keys = JSON.stringify(fields.filter((f: any) => !['heading', 'paragraph'].includes(f.type)).map((f: any) => ({ key: f.key, type: f.type })));
-      box.hidden = false;
-    } catch { /* נשארים עם הטופס הבסיסי */ }
-  }
-
-  // אוסף את תשובות השדות הנוספים לאובייקט.
-  function collectExtra(form: HTMLFormElement, box: HTMLElement): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    let keys: { key: string; type: string }[] = [];
-    try { keys = JSON.parse(box.dataset.keys || '[]'); } catch { /* noop */ }
-    for (const { key, type } of keys) {
-      const el = form.querySelector<HTMLInputElement>(`[name="x_${key}"]`);
-      if (!el) continue;
-      out[key] = type === 'boolean' ? el.checked : el.value.trim();
+    wrap.append(lab, control);
+    if (f?.help) {
+      const hint = document.createElement('span');
+      hint.className = 'hint';
+      hint.textContent = String(f.help);
+      wrap.append(hint);
     }
-    return out;
+    return wrap;
   }
 
   document.querySelectorAll<HTMLFormElement>('form.apply').forEach(form => {
@@ -110,9 +219,10 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
     const submit = form.querySelector<HTMLButtonElement>('.submit')!;
     const file = form.querySelector<HTMLInputElement>('#cv');
     const extraBox = form.querySelector<HTMLElement>('[data-extra]')!;
+    const endpoint = form.dataset.endpoint || '';
+    const isDemo = form.dataset.demo === 'true';
+    let extraKeys: { key: string; type: string }[] = [];
     let sending = false;
-
-    loadExtra(form, extraBox);
 
     function say(msg: string, kind: 'ok' | 'err' | 'info') {
       status.hidden = false;
@@ -120,33 +230,152 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
       status.className = `form-status is-${kind}`;
     }
 
+    function errorNodeFor(el: Element): HTMLElement | null {
+      const name = (el as HTMLInputElement).name;
+      return form.querySelector<HTMLElement>(`#${CSS.escape(name)}-err`);
+    }
+
+    function setFieldError(el: Element, msg: string | null) {
+      const node = errorNodeFor(el);
+      if (msg) {
+        el.setAttribute('aria-invalid', 'true');
+        if (node) { node.textContent = msg; node.hidden = false; }
+      } else {
+        el.removeAttribute('aria-invalid');
+        if (node) { node.textContent = ''; node.hidden = true; }
+      }
+    }
+
+    function clearErrors() {
+      form.querySelectorAll('[aria-invalid="true"]').forEach(el => setFieldError(el, null));
+    }
+
+    function messageFor(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string {
+      if (el.validity.valueMissing) {
+        return FIELD_ERROR[el.name] ?? 'שדה חובה.';
+      }
+      if (el.type === 'email') return 'כתובת הדוא״ל אינה תקינה. לדוגמה: name@example.com';
+      if (el.type === 'tel') return 'מספר הטלפון אינו תקין. לדוגמה: 050-0000000';
+      return 'הערך שהוזן אינו תקין.';
+    }
+
+    /** מסמן כל שדה שגוי, ומחזיר את הראשון שבהם כדי להעביר אליו פוקוס (B9). */
+    function validate(): HTMLElement | null {
+      clearErrors();
+      let first: HTMLElement | null = null;
+      const controls = form.querySelectorAll<HTMLInputElement>('input, select, textarea');
+      for (const el of controls) {
+        if (el.type === 'hidden' || el.name === 'company_website') continue;
+        if (el.checkValidity()) continue;
+        setFieldError(el, messageFor(el));
+        first ??= el;
+      }
+      if (file?.files?.length) {
+        const f = file.files[0];
+        if (f.size > MAX_BYTES) {
+          setFieldError(file, ERROR_TEXT.file_too_large);
+          first ??= file;
+        } else if (!OK_EXT.test(f.name) || (f.type && !OK_TYPES.includes(f.type))) {
+          setFieldError(file, ERROR_TEXT.file_type);
+          first ??= file;
+        }
+      }
+      return first;
+    }
+
+    // טוען את שדות טופס ההגשה מהמערכת ומרנדר אותם. כשל אינו שובר את הטופס הבסיסי.
+    async function loadExtra() {
+      if (!endpoint) return;
+      try {
+        const res = await fetch(endpoint, { method: 'GET' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const fields = (Array.isArray(data?.fields) ? data.fields : [])
+          .slice()
+          .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
+        const frag = document.createDocumentFragment();
+        const keys: { key: string; type: string }[] = [];
+        for (const f of fields) {
+          const node = buildField(f);
+          if (!node) continue;
+          frag.append(node);
+          if (!['heading', 'paragraph'].includes(String(f.type))) {
+            keys.push({ key: String(f.key), type: String(f.type) });
+          }
+        }
+        if (!frag.childNodes.length) return;
+        extraBox.replaceChildren(frag);
+        extraKeys = keys;
+        extraBox.hidden = false;
+      } catch { /* נשארים עם הטופס הבסיסי */ }
+    }
+
+    function collectExtra(): Record<string, unknown> {
+      const out: Record<string, unknown> = {};
+      for (const { key, type } of extraKeys) {
+        const el = form.querySelector<HTMLInputElement>(`[name="x_${key}"]`);
+        if (!el) continue;
+        out[key] = type === 'boolean' ? el.checked : el.value.trim();
+      }
+      return out;
+    }
+
+    loadExtra();
+
+    form.addEventListener('input', e => {
+      const el = e.target as HTMLElement;
+      if (el?.getAttribute?.('aria-invalid') === 'true') setFieldError(el, null);
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (sending) return;                       // מונע כפילות מלחיצה כפולה
       form.querySelectorAll('input').forEach(i => i.setAttribute('data-touched', ''));
 
-      if (!form.checkValidity()) { say('נא למלא את שדות החובה.', 'err'); return; }
-
-      if (file?.files?.length) {
-        const f = file.files[0];
-        if (f.size > MAX_BYTES) { say('הקובץ גדול מ-10MB. נסו קובץ קטן יותר.', 'err'); return; }
-        if (f.type && !OK_TYPES.includes(f.type)) { say('אפשר לצרף PDF או Word בלבד.', 'err'); return; }
+      const firstInvalid = validate();
+      if (firstInvalid) {
+        say('לא שלחנו עדיין — יש שדות שדורשים תיקון.', 'err');
+        firstInvalid.focus();                    // העברת פוקוס לשדה הראשון (B9)
+        return;
       }
 
       sending = true; submit.disabled = true;
       say('שולח…', 'info');
+
+      if (isDemo) {
+        // פיתוח מקומי בלבד. אף פעם לא בבנייה שנפרסת (K2).
+        say('מצב פיתוח: לא נשלח דבר לשרת.', 'info');
+        sending = false; submit.disabled = false;
+        return;
+      }
+
       try {
         const fd = new FormData(form);
-        const extra = collectExtra(form, extraBox);
+        const extra = collectExtra();
         if (Object.keys(extra).length) fd.set('extra_answers', JSON.stringify(extra));
-        const res = await fetch(form.dataset.endpoint!, { method: 'POST', body: fd });
-        if (!res.ok) throw new Error(String(res.status));
-        form.reset();
-        say('קיבלנו את המועמדות שלך. ניצור קשר בהקדם.', 'ok');
-        submit.hidden = true;
+        const res = await fetch(endpoint, { method: 'POST', body: fd });
+        const json = await res.json().catch(() => ({} as any));
+
+        if (res.ok && json?.ok !== false) {
+          form.reset();
+          clearErrors();
+          say('קיבלנו את המועמדות שלך. ניצור קשר בהקדם.', 'ok');
+          submit.hidden = true;
+          return;
+        }
+
+        const code = String(json?.error ?? STATUS_CODE[res.status] ?? 'server_error');
+        if (code === 'missing_fields' && Array.isArray(json?.fields)) {
+          for (const name of json.fields) {
+            const el = form.querySelector<HTMLInputElement>(`[name="${CSS.escape(String(name))}"]`);
+            if (el) setFieldError(el, FIELD_ERROR[String(name)] ?? 'שדה חובה.');
+          }
+        }
+        say(ERROR_TEXT[code] ?? ERROR_TEXT.server_error, 'err');
+        sending = false; submit.disabled = false;
       } catch {
         // כשל ברשת אינו מאבד את מה שהמשתמש הקליד; אפשר לנסות שוב.
-        say('משהו השתבש בשליחה. נסו שוב, או פנו אלינו בטלפון.', 'err');
+        say('לא הצלחנו להתחבר לשרת. בדקו את החיבור ונסו שוב, או פנו אלינו בטלפון.', 'err');
         sending = false; submit.disabled = false;
       }
     });
@@ -156,14 +385,33 @@ const endpoint = import.meta.env.PUBLIC_APPLY_ENDPOINT ?? '/api/apply';
 <style>
   .apply { display: grid; gap: 15px; }
   .extra-fields { display: grid; gap: 15px; }
-  .x-head { font-size: 1rem; font-weight: 700; margin: 6px 0 0; color: var(--ink); }
-  .x-para { font-size: .9rem; color: var(--ink-mid); margin: 0; line-height: 1.5; }
-  .req { color: var(--accent); }
-  .consent { display: flex; gap: 9px; align-items: start; font-size: .88rem; color: var(--ink-mid); line-height: 1.5; }
-  .consent input { margin-block-start: 3px; inline-size: auto; min-height: 0; }
+  /* השדות הדינמיים נוצרים ב-JS ולכן אין להם את תווית ה-scope של Astro —
+     הכללים עבורם חייבים להיות :global בתוך המכל. */
+  .extra-fields :global(.x-head) { font-size: 1rem; font-weight: 700; margin: 6px 0 0; color: var(--ink); }
+  .extra-fields :global(.x-para) { font-size: .9rem; color: var(--ink-mid); margin: 0; line-height: 1.5; }
+  .consent,
+  .extra-fields :global(.consent) { display: flex; gap: 9px; align-items: start; font-size: .88rem; color: var(--ink-mid); line-height: 1.5; }
+  .consent input,
+  .extra-fields :global(.consent) input { margin-block-start: 3px; inline-size: auto; min-height: 0; }
   .submit { inline-size: 100%; margin-block-start: 4px; }
+  .field-error {
+    color: var(--danger); font-size: .85rem; font-weight: 600;
+    margin-block-start: 5px;
+  }
+  .field-error::before { content: "⚠ "; }
+  .demo-note {
+    background: var(--surface-sunk); color: var(--ink-mid);
+    border: 1px dashed var(--line-strong); border-radius: var(--radius-sm);
+    padding: 8px 12px; font-size: .85rem;
+  }
+  .apply-unavailable {
+    background: var(--danger-soft); color: var(--danger);
+    border-radius: var(--radius); padding: 16px 18px;
+    display: grid; gap: 8px; font-size: .95rem;
+  }
+  .apply-unavailable a { color: inherit; }
   .form-status { font-size: .92rem; font-weight: 600; padding: 10px 12px; border-radius: var(--radius-sm); }
   .form-status.is-ok  { background: var(--brand-soft); color: var(--brand-ink); }
-  .form-status.is-err { background: #fbeae7; color: var(--danger); }
+  .form-status.is-err { background: var(--danger-soft); color: var(--danger); }
   .form-status.is-info{ background: var(--surface-sunk); color: var(--ink-mid); }
 </style>

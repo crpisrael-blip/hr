@@ -11,3 +11,6 @@ dist/
 supabase/.temp/
 
 *.tsbuildinfo
+
+# הגדרות Claude Code מקומיות למכונה אחת — לא משותפות
+.claude/settings.local.json

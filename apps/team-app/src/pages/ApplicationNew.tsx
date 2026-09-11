@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
+import { Msg } from '../components/Msg';
 
 interface Opt { id: string; label: string; }
 
 export default function ApplicationNew() {
   const nav = useNavigate();
   const [sp] = useSearchParams();
+  const { employee } = useAuth();
   const [candidates, setCandidates] = useState<Opt[]>([]);
   const [jobs, setJobs] = useState<Opt[]>([]);
   const [candidateId, setCandidateId] = useState(sp.get('candidate') ?? '');
@@ -17,22 +21,34 @@ export default function ApplicationNew() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     supabase.from('candidates').select('id, full_name').order('created_at', { ascending: false }).limit(500)
-      .then(r => { if (!r.error) setCandidates((r.data as any[]).map(c => ({ id: c.id, label: c.full_name }))); });
-    supabase.from('jobs').select('id, title, companies(name)').in('stage', ['open', 'on_hold', 'draft']).order('created_at', { ascending: false })
-      .then(r => { if (!r.error) setJobs((r.data as any[]).map(j => ({ id: j.id, label: j.companies?.name ? `${j.title} — ${j.companies.name}` : j.title }))); });
+      .then(r => {
+        if (!alive) return;
+        if (r.error) { setErr(toUserMessage(r.error, 'טעינת רשימת המועמדים נכשלה.')); return; }
+        setCandidates((r.data as { id: string; full_name: string }[]).map(c => ({ id: c.id, label: c.full_name })));
+      });
+    supabase.from('jobs').select('id, title, companies(name)').in('stage', ['open', 'on_hold', 'draft'])
+      .order('created_at', { ascending: false }).limit(500)
+      .then(r => {
+        if (!alive) return;
+        if (r.error) { setErr(toUserMessage(r.error, 'טעינת רשימת המשרות נכשלה.')); return; }
+        const rows = r.data as unknown as { id: string; title: string; companies: { name: string } | null }[];
+        setJobs(rows.map(j => ({ id: j.id, label: j.companies?.name ? `${j.title} — ${j.companies.name}` : j.title })));
+      });
+    return () => { alive = false; };
   }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault(); setErr(''); setBusy(true);
-    const { data: emp } = await supabase.from('employees').select('id').eq('user_id', (await supabase.auth.getUser()).data.user?.id).maybeSingle();
+    // מזהה העובד כבר קיים ב-useAuth — אין צורך בסיבוב נוסף ל-auth.getUser + employees.
     const { data, error } = await supabase.from('applications').insert({
       candidate_id: candidateId, job_id: jobId, source: source.trim() || null,
-      recruiter_id: emp?.id ?? null, stage: 'new',
+      recruiter_id: employee?.id ?? null, stage: 'new',
     }).select('id').single();
     setBusy(false);
     if (error) {
-      setErr(error.code === '23505' ? 'כבר קיימת מועמדות של המועמד הזה למשרה הזו.' : error.message);
+      setErr(error.code === '23505' ? 'כבר קיימת מועמדות של המועמד הזה למשרה הזו.' : toUserMessage(error, 'פתיחת המועמדות נכשלה.'));
       return;
     }
     nav(`/applications/${data!.id}`);
@@ -54,7 +70,7 @@ export default function ApplicationNew() {
           </select></label>
         <label><span className="lbl">מקור</span>
           <input value={source} onChange={e => setSource(e.target.value)} /></label>
-        {err && <p className="msg err">{err}</p>}
+        <Msg kind="err">{err}</Msg>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-primary" disabled={busy || !candidateId || !jobId}>{busy ? 'שומר…' : 'פתיחת מועמדות'}</button>
           <button type="button" className="btn btn-quiet" onClick={() => nav(-1)}>ביטול</button>

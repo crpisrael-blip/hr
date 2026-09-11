@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import ApplyForm from '../../components/ApplyForm.astro';
 import { loadJobs, type Job } from '../../data/jobs';
 
 export async function getStaticPaths() {
@@ -13,88 +14,22 @@ const { job } = Astro.props;
       description={`טופס הגשת מועמדות למשרת ${job.title}`}
       noindex={true}>
   <div class="page wrap">
-    <nav class="crumbs" aria-label="מיקום">
-      <a href="/jobs">משרות</a> <span aria-hidden="true">›</span>
-      <a href={`/jobs/${job.slug}`}>{job.title}</a> <span aria-hidden="true">›</span> <span>הגשה</span>
+    <nav class="crumbs" aria-label="פירורי לחם">
+      <a href="/jobs/">משרות</a> <span aria-hidden="true">›</span>
+      <a href={`/jobs/${job.slug}/`}>{job.title}</a> <span aria-hidden="true">›</span>
+      <span aria-current="page">הגשה</span>
     </nav>
 
     <h1>הגשת מועמדות</h1>
     <p class="sub">למשרה: <strong>{job.title}</strong></p>
 
-    <form id="apply-form" class="form" novalidate data-slug={job.slug}>
-      <div class="field">
-        <label class="label" for="name">שם מלא <span class="req">*</span></label>
-        <input type="text" id="name" name="full_name" required autocomplete="name" />
-      </div>
-      <div class="field">
-        <label class="label" for="phone">טלפון <span class="req">*</span></label>
-        <input type="tel" id="phone" name="phone" required inputmode="tel"
-               autocomplete="tel" placeholder="050-0000000" />
-        <span class="hint">נשתמש בטלפון כדי ליצור קשר ולזהות הגשות קודמות.</span>
-      </div>
-      <div class="field">
-        <label class="label" for="email">דוא״ל</label>
-        <input type="email" id="email" name="email" autocomplete="email" />
-      </div>
-      <div class="field">
-        <label class="label" for="cv">קורות חיים (PDF או Word)</label>
-        <input type="file" id="cv" name="cv" accept=".pdf,.doc,.docx" />
-        <span class="hint">עד 10MB. אפשר גם להגיש בלי קובץ ולצרף מאוחר יותר.</span>
-      </div>
-      <label class="consent">
-        <input type="checkbox" id="consent" name="consent" required />
-        <span>אני מאשר/ת שימוש בפרטים שלי לצורך הליך הגיוס, בהתאם ל<a href="/privacy">מדיניות הפרטיות</a>.</span>
-      </label>
+    <!-- הטופס הוא הקומפוננטה המשותפת: מלכודת בוטים, ולידציית קובץ,
+         מנעול הגשה כפולה ושאלות נוספות מבנאי הטפסים (K1). -->
+    <ApplyForm slug={job.slug} jobTitle={job.title} />
 
-      <div class="actions">
-        <button type="submit" class="btn btn-accent" id="submit-btn">שליחת מועמדות</button>
-        <a href={`/jobs/${job.slug}`} class="btn btn-quiet">ביטול</a>
-      </div>
-      <p class="form-msg" id="form-msg" role="status" aria-live="polite" hidden></p>
-    </form>
+    <p class="back"><a href={`/jobs/${job.slug}/`}>חזרה לפרטי המשרה</a></p>
   </div>
 </Base>
-
-<script>
-  const form = document.getElementById('apply-form') as HTMLFormElement;
-  const msg = document.getElementById('form-msg')!;
-  const btn = document.getElementById('submit-btn') as HTMLButtonElement;
-  // נקודת הקצה של שכבת ה-API. נקבע כמשתנה סביבה בבנייה; עד אז ההגשה מדומה.
-  const endpoint = (import.meta.env.PUBLIC_APPLY_ENDPOINT as string) || '';
-
-  function show(text: string, ok: boolean) {
-    msg.textContent = text;
-    msg.hidden = false;
-    msg.className = 'form-msg ' + (ok ? 'ok' : 'err');
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    for (const el of form.querySelectorAll('input')) el.setAttribute('data-touched', '');
-    if (!form.checkValidity()) { show('נא למלא שם, טלפון ולאשר את השימוש בפרטים.', false); return; }
-
-    btn.disabled = true; btn.textContent = 'שולח…';
-    try {
-      if (!endpoint) {
-        // עד ששכבת ה-API עולה: הגשה מדומה כדי שהטופס יהיה בדיק.
-        await new Promise(r => setTimeout(r, 500));
-        show('ההגשה התקבלה. (מצב הדגמה — חיבור לשרת יתווסף בהמשך.)', true);
-        form.reset();
-        return;
-      }
-      const data = new FormData(form);
-      data.append('slug', form.dataset.slug!);
-      const res = await fetch(endpoint, { method: 'POST', body: data });
-      if (!res.ok) throw new Error(String(res.status));
-      show('ההגשה התקבלה בהצלחה. ניצור איתך קשר בהקדם.', true);
-      form.reset();
-    } catch {
-      show('אירעה תקלה בשליחה. נסו שוב, או פנו אלינו בעמוד יצירת הקשר.', false);
-    } finally {
-      btn.disabled = false; btn.textContent = 'שליחת מועמדות';
-    }
-  });
-</script>
 
 <style>
   .wrap { padding-block: 24px 48px; max-width: 640px; }
@@ -102,12 +37,5 @@ const { job } = Astro.props;
   .crumbs a { color: var(--ink-mid); }
   h1 { margin-block-end: 4px; }
   .sub { color: var(--ink-mid); margin-block-end: 24px; }
-  .form { display: grid; gap: 18px; }
-  .req { color: var(--accent); }
-  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: .92rem; color: var(--ink-mid); }
-  .consent input { inline-size: 18px; block-size: 18px; margin-block-start: 2px; flex: 0 0 auto; }
-  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
-  .form-msg { padding: 12px 14px; border-radius: var(--radius-sm); font-weight: 600; }
-  .form-msg.ok { background: var(--brand-soft); color: var(--brand-ink); }
-  .form-msg.err { background: #fbeae7; color: var(--danger); }
+  .back { margin-block-start: 20px; font-size: .92rem; }
 </style>

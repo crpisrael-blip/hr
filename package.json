@@ -3,14 +3,22 @@
   "private": true,
   "version": "0.1.0",
   "description": "מערכת גיוס והשמה: אתר ציבורי, אזור אישי למועמדים וממשק חברה",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": ["apps/*"],
   "scripts": {
     "build": "npm run build --workspace=@hr/team-app",
     "build:team": "npm run build --workspace=@hr/team-app",
     "build:candidate": "npm run build --workspace=@hr/candidate-app",
     "build:public": "npm run build --workspace=@hr/public-site",
+    "build:all": "npm run build:public && npm run build:team && npm run build:candidate",
+    "check:public": "npm run check --workspace=@hr/public-site",
+    "deploy:team": "wrangler deploy --config apps/team-app/wrangler.toml",
+    "deploy:candidate": "wrangler deploy --config apps/candidate-app/wrangler.toml",
+    "deploy:public": "wrangler deploy --config apps/public-site/wrangler.toml",
     "db:test": "./scripts/db-test.sh",
     "db:schema": "./scripts/build-schema.sh"
   },
-  "engines": { "node": ">=20" }
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  },
+  "engines": { "node": ">=22" }
 }

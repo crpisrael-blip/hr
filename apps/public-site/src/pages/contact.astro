@@ -1,13 +1,27 @@
 ---
 import Base from '../layouts/Base.astro';
+import { SITE } from '../data/site';
 ---
-<Base title="יצירת קשר — URSA GROUP" description="דרכי יצירת קשר עם משרד הגיוס וההשמה.">
+<Base title={`יצירת קשר — ${SITE.shortName}`} description="דרכי יצירת קשר עם משרד הגיוס וההשמה.">
   <div class="page prose">
     <h1>יצירת קשר</h1>
     <p class="lede measure">יש לכם שאלה על משרה, או שאתם מעסיקים שמחפשים לגייס? נשמח לשמוע.</p>
     <div class="cards">
-      <div class="c"><h2>מועמדים</h2><p>הדרך המהירה ביותר היא להגיש מועמדות ישירות למשרה שמעניינת אתכם.</p><a href="/jobs" class="btn btn-primary">למשרות הפתוחות</a></div>
-      <div class="c"><h2>מעסיקים</h2><p>מחפשים לגייס? כתבו לנו ונחזור אליכם עם הצעה מותאמת.</p><a href="mailto:info@ort-tech.co.il" class="btn btn-quiet">info@ort-tech.co.il</a></div>
+      <div class="c">
+        <h2>מועמדים</h2>
+        <p>הדרך המהירה ביותר היא להגיש מועמדות ישירות למשרה שמעניינת אתכם.</p>
+        <a href="/jobs/" class="btn btn-primary">למשרות הפתוחות</a>
+      </div>
+      <div class="c">
+        <h2>מעסיקים</h2>
+        <p>מחפשים לגייס? כתבו לנו ונחזור אליכם עם הצעה מותאמת.</p>
+        <a href={`mailto:${SITE.employersEmail}`} class="btn btn-quiet" dir="ltr">{SITE.employersEmail}</a>
+      </div>
+      <div class="c">
+        <h2>פרטיות ונגישות</h2>
+        <p>פניות בנושא המידע שנשמר עליכם, או בנושא נגישות האתר.</p>
+        <a href={`mailto:${SITE.privacyEmail}`} class="btn btn-quiet" dir="ltr">{SITE.privacyEmail}</a>
+      </div>
     </div>
   </div>
 </Base>

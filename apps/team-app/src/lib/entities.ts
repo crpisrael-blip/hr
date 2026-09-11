@@ -33,14 +33,10 @@ export const ENTITIES: EntityType[] = [
       { col: 'source',           label: 'מקור' },
       { col: 'skills',           label: 'כישורים (רשימה)' },
     ] },
-  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, mappable: true, linkable: true,
-    columns: [
-      { col: 'full_name', label: 'שם מלא' },
-      { col: 'email',     label: 'דוא״ל' },
-      { col: 'phone',     label: 'טלפון' },
-      { col: 'job_title', label: 'תפקיד' },
-      { col: 'notes',     label: 'הערות' },
-    ] },
+  // ★ אבטחה: employees אינה mappable בכוונה. מיפוי שדות מאפשר לכל עורך טופס
+  // לקבוע טבלה+עמודה שתשובה מהטופס תדרוס — ורשומת עובד נושאת role/employment_status/user_id.
+  // מיפוי לעובדים ייפתח רק כשתהיה אכיפה בצד השרת על העמודות המותרות.
+  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, linkable: true },
   { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true, customFields: true,
     columns: [
       { col: 'name',        label: 'שם החברה' },
@@ -74,11 +70,21 @@ export const MAPPABLE = ENTITIES.filter(e => e.mappable);
 // סוגי ישות שתומכים בשדות מותאמים ללא קוד.
 export const CUSTOM_FIELD_ENTITIES = ENTITIES.filter(e => e.customFields);
 
+// ישויות שניתן לקשר אליהן משימה (תואם ל-enum app.linked_entity).
+export const TASK_LINK_ENTITIES = ['candidate', 'company', 'job', 'application', 'placement', 'contact'] as const;
+export const isTaskLinkEntity = (v?: string | null): v is typeof TASK_LINK_ENTITIES[number] =>
+  !!v && (TASK_LINK_ENTITIES as readonly string[]).includes(v);
+
 export const entityByKey = (k?: string | null) => ENTITIES.find(e => e.key === k) || null;
 export const tableForEntity = (k?: string | null) => entityByKey(k)?.table ?? null;
 export const entityByTable = (t?: string | null) => ENTITIES.find(e => e.table === t) || null;
 // עמודות שמותר למפות אליהן לפי שם הטבלה (לרשימת בחירה בבנאי הטפסים).
 export const columnsForTable = (t?: string | null): EntityColumn[] => entityByTable(t)?.columns ?? [];
+/** האם מותר לכתוב מטופס לעמודה הזו — נבדק גם בצד הלקוח לפני עדכון. */
+export const isMappableColumn = (table?: string | null, column?: string | null): boolean => {
+  const en = entityByTable(table);
+  return !!en?.mappable && !!column && (en.columns ?? []).some(c => c.col === column);
+};
 
 // קטגוריות תיוק/גיוס — רשימה מרכזית. מוצגות כהצעות (עם אפשרות טקסט חופשי).
 export const FORM_CATEGORIES: string[] = [

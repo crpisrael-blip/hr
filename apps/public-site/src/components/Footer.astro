@@ -1,4 +1,5 @@
 ---
+import { SITE } from '../data/site';
 const year = new Date().getFullYear();
 ---
 <footer class="site-footer">
@@ -6,28 +7,29 @@ const year = new Date().getFullYear();
     <div>
       <picture>
         <source srcset="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
-        <img src="/ursa-logo.png" alt="URSA GROUP" style="height:36px;width:auto" />
+        <!-- width/height אמיתיים במקום style, כדי שהדפדפן ישריין מקום ולא יקפיץ את הפריסה -->
+        <img src="/ursa-logo.png" alt={SITE.shortName} class="foot-logo" width="280" height="81" />
       </picture>
       <p class="tagline measure">משרדי גיוס והשמה. מחברים בין אנשים למקומות שבהם הם יעשו את העבודה הטובה ביותר שלהם.</p>
     </div>
     <nav aria-label="ניווט תחתון">
       <h2>ניווט</h2>
       <ul>
-        <li><a href="/jobs">משרות פתוחות</a></li>
-        <li><a href="/about">אודות</a></li>
-        <li><a href="/contact">יצירת קשר</a></li>
+        <li><a href="/jobs/">משרות פתוחות</a></li>
+        <li><a href="/about/">אודות</a></li>
+        <li><a href="/contact/">יצירת קשר</a></li>
       </ul>
     </nav>
     <nav aria-label="מדיניות">
       <h2>מידע</h2>
       <ul>
-        <li><a href="/privacy">מדיניות פרטיות</a></li>
-        <li><a href="/accessibility">הצהרת נגישות</a></li>
+        <li><a href="/privacy/">מדיניות פרטיות</a></li>
+        <li><a href="/accessibility/">הצהרת נגישות</a></li>
       </ul>
     </nav>
   </div>
   <div class="page legal">
-    <p>© {year} URSA GROUP. כל הזכויות שמורות.</p>
+    <p>© {year} {SITE.shortName}. כל הזכויות שמורות.</p>
   </div>
 </footer>
 
@@ -42,8 +44,7 @@ const year = new Date().getFullYear();
     display: grid; gap: 32px;
     grid-template-columns: 2fr 1fr 1fr;
   }
-  .brand-mark { font-weight: 700; font-size: 1.1rem; color: var(--ink); }
-  .brand-mark { color: var(--brand); }
+  .foot-logo { block-size: 36px; inline-size: auto; display: block; }
   .tagline { color: var(--ink-mid); margin-block-start: 10px; font-size: .95rem; }
   h2 { font-size: .82rem; text-transform: none; color: var(--ink-soft); font-weight: 600; margin-block-end: 10px; }
   ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
