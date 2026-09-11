@@ -24,11 +24,18 @@
 התיקייה לכל שלושת הפרויקטים היא **שורש הריפו** (monorepo עם npm workspaces:
 התלויות מותקנות פעם אחת בשורש, ולכן פקודת בנייה מתוך תיקיית האפליקציה תיכשל).
 
-| Cloudflare project | Root directory | Build command | Output directory | משתני Build נדרשים |
-|---|---|---|---|---|
-| `hr-public-site` | `/` | `npm run build:public` | `apps/public-site/dist` | `NODE_VERSION=22`, `DATABASE_URL`, `PUBLIC_APPLY_ENDPOINT`, (רשות) `PUBLIC_SITE_URL` |
-| `hr-team-app` | `/` | `npm run build:team` | `apps/team-app/dist` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| `hr-candidate-app` | `/` | `npm run build:candidate` | `apps/candidate-app/dist` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| Cloudflare project | Root directory | Build command | Deploy command | Output directory | משתני Build נדרשים |
+|---|---|---|---|---|---|
+| `hr-public-site` | `/` | `npm run build:public` | `npm run deploy:public` | `apps/public-site/dist` | `NODE_VERSION=22`, `DATABASE_URL`, `PUBLIC_APPLY_ENDPOINT`, (רשות) `PUBLIC_SITE_URL` |
+| `hr-team-app` | `/` | `npm run build:team` | `npm run deploy:team` | `apps/team-app/dist` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| `hr-candidate-app` | `/` | `npm run build:candidate` | `npm run deploy:candidate` | `apps/candidate-app/dist` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+> ⚠️ **חובה להגדיר את שדה `Deploy command` בכל פרויקט Worker.** אין `wrangler.toml`
+> בשורש הריפו (הוסר בכוונה — הוא הצביע על team-app בלבד וקשר את שלושת הפרויקטים
+> לאותה אפליקציה). ברירת המחדל של Cloudflare, `npx wrangler deploy`, מריצה
+> מ-Root directory (`/`) ולא מוצאת שם קובץ קונפיגורציה — ונכשלת עם
+> *"create a wrangler.jsonc … Failed"*. פקודות ה-`deploy:*` שבטבלה מוסיפות
+> `--config apps/<app>/wrangler.toml` ומפנות כל פרויקט לאפליקציה הנכונה.
 
 פריסה ידנית מהמכונה — אין `wrangler.toml` בשורש, ולכן כל פקודה מקבלת `--config`:
 
