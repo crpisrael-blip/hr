@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { COMPANY_STATUS, safeUrl } from '../lib/format';
+import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
+import { Msg } from '../components/Msg';
 import { CustomFieldsEdit } from '../components/CustomFields';
 
 export default function CompanyNew() {
@@ -9,16 +12,19 @@ export default function CompanyNew() {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('active');
   const [website, setWebsite] = useState('');
-  const [custom, setCustom] = useState<Record<string, any>>({});
+  const [custom, setCustom] = useState<Record<string, unknown>>({});
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
+    e.preventDefault(); setErr('');
+    const site = website.trim() ? safeUrl(website) : null;
+    if (website.trim() && !site) { setErr('כתובת האתר אינה תקינה. יש להזין כתובת http או https.'); return; }
+    setBusy(true);
     const { error } = await supabase.from('companies')
-      .insert({ name: name.trim(), status, website: website.trim() || null, custom });
+      .insert({ name: name.trim(), status, website: site, custom });
     setBusy(false);
-    if (error) setErr(error.message); else nav('/companies');
+    if (error) setErr(toUserMessage(error, 'שמירת החברה נכשלה.')); else nav('/companies');
   }
 
   return (
@@ -29,13 +35,12 @@ export default function CompanyNew() {
           <input value={name} onChange={e => setName(e.target.value)} required autoFocus /></label>
         <label><span className="lbl">סטטוס</span>
           <select value={status} onChange={e => setStatus(e.target.value)}>
-            <option value="lead">ליד</option><option value="active">פעילה</option>
-            <option value="on_hold">בהמתנה</option><option value="inactive">לא פעילה</option>
+            {Object.entries(COMPANY_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></label>
         <label><span className="lbl">אתר</span>
           <input type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://" /></label>
         <CustomFieldsEdit entityType="company" values={custom} onChange={setCustom} />
-        {err && <p className="msg err">{err}</p>}
+        <Msg kind="err">{err}</Msg>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-primary" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button>
           <button type="button" className="btn btn-quiet" onClick={() => nav('/companies')}>ביטול</button>

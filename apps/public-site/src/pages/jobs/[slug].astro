@@ -1,6 +1,10 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { loadJobs, type Job, SCOPE_LABEL, formatDate } from '../../data/jobs';
+import {
+  loadJobs, type Job, SCOPE_LABEL, SCOPE_SCHEMA, formatDate, isoDate,
+  excerpt, validThrough, isRemoteLocation,
+} from '../../data/jobs';
+import { SITE } from '../../data/site';
 
 export async function getStaticPaths() {
   const jobs = await loadJobs();
@@ -21,35 +25,95 @@ const blocks = job.body.split(/\n{2,}/).map(chunk => {
   return { text: lines.join(' ') };
 });
 
-const jsonLd = {
+const pageUrl = new URL(`/jobs/${job.slug}/`, Astro.site).href;
+const remote = isRemoteLocation(job.location);
+const description = excerpt(job.body);
+
+// jobLocation חייב להיות מקום אמיתי. "עבודה היברידית" אינו יישוב ולכן
+// מתורגם ל-jobLocationType + applicantLocationRequirements (B2).
+const locationFields = remote
+  ? {
+      jobLocationType: 'TELECOMMUTE',
+      applicantLocationRequirements: { '@type': 'Country', name: 'IL' },
+    }
+  : {
+      jobLocation: {
+        '@type': 'Place',
+        address: {
+          '@type': 'PostalAddress',
+          ...(job.location ? { addressLocality: job.location } : {}),
+          addressCountry: 'IL',
+        },
+      },
+    };
+
+const jobPosting = {
   '@context': 'https://schema.org',
   '@type': 'JobPosting',
   title: job.title,
   description: job.body,
-  datePosted: job.published_at,
-  employmentType: job.employment_scope ?? undefined,
-  hiringOrganization: job.company_name
-    ? { '@type': 'Organization', name: job.company_name }
-    : { '@type': 'Organization', name: 'URSA GROUP' },
-  jobLocation: job.location
-    ? { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: job.location, addressCountry: 'IL' } }
-    : undefined,
+  identifier: { '@type': 'PropertyValue', name: SITE.shortName, value: job.slug },
+  url: pageUrl,
+  datePosted: isoDate(job.published_at),
+  validThrough: validThrough(job.published_at),
+  directApply: true,
+  ...(job.employment_scope ? { employmentType: SCOPE_SCHEMA[job.employment_scope] } : {}),
+  hiringOrganization: {
+    '@type': 'Organization',
+    name: job.company_name ?? SITE.shortName,
+  },
+  ...(job.company_name
+    ? { employmentAgency: { '@type': 'Organization', name: SITE.shortName, url: new URL('/', Astro.site).href } }
+    : {}),
+  ...locationFields,
+};
+
+const breadcrumbs = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'בית', item: new URL('/', Astro.site).href },
+    { '@type': 'ListItem', position: 2, name: 'משרות', item: new URL('/jobs/', Astro.site).href },
+    { '@type': 'ListItem', position: 3, name: job.title, item: pageUrl },
+  ],
 };
 ---
-<Base title={`${job.title} — URSA GROUP`} description={job.body.slice(0, 155)} jsonLd={jsonLd}>
+<Base title={`${job.title} — ${SITE.shortName}`}
+      description={description}
+      ogType="article"
+      jsonLd={[jobPosting, breadcrumbs]}>
   <div class="page wrap">
-    <nav class="crumbs" aria-label="מיקום">
-      <a href="/jobs">משרות</a> <span aria-hidden="true">›</span> <span>{job.title}</span>
+    <nav class="crumbs" aria-label="פירורי לחם">
+      <a href="/jobs/">משרות</a> <span aria-hidden="true">›</span>
+      <span aria-current="page">{job.title}</span>
     </nav>
 
     <article class="detail">
       <header>
         <h1>{job.title}</h1>
-        <ul class="meta" aria-label="פרטי משרה">
-          {job.location && <li>📍 {job.location}</li>}
-          {scope && <li>🕒 {scope}</li>}
-          {job.company_name && <li>🏢 {job.company_name}</li>}
-          <li>📅 פורסם {formatDate(job.published_at)}</li>
+        <ul class="meta">
+          {job.location && (
+            <li>
+              <span aria-hidden="true">📍</span>
+              <span class="visually-hidden">מיקום:</span> {job.location}
+            </li>
+          )}
+          {scope && (
+            <li>
+              <span aria-hidden="true">🕒</span>
+              <span class="visually-hidden">היקף משרה:</span> {scope}
+            </li>
+          )}
+          {job.company_name && (
+            <li>
+              <span aria-hidden="true">🏢</span>
+              <span class="visually-hidden">חברה:</span> {job.company_name}
+            </li>
+          )}
+          <li>
+            <span aria-hidden="true">📅</span>
+            פורסם <time datetime={isoDate(job.published_at)}>{formatDate(job.published_at)}</time>
+          </li>
         </ul>
       </header>
 
@@ -63,8 +127,8 @@ const jsonLd = {
     <aside class="apply-box">
       <h2>מעוניינים במשרה?</h2>
       <p>הגישו מועמדות בכמה דקות. מגייס אישי יחזור אליכם.</p>
-      <a href={`/apply/${job.slug}`} class="btn btn-accent">הגשת מועמדות</a>
-      <a href="/jobs" class="btn btn-quiet">חזרה לכל המשרות</a>
+      <a href={`/apply/${job.slug}/`} class="btn btn-accent">הגשת מועמדות</a>
+      <a href="/jobs/" class="btn btn-quiet">חזרה לכל המשרות</a>
     </aside>
   </div>
 </Base>

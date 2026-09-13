@@ -2,16 +2,43 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { SITE } from '../data/site';
 
 interface Props {
   title: string;
   description: string;
   /** משרה שנסגרה או עמוד שאין טעם לאנדקס */
   noindex?: boolean;
-  jsonLd?: object;
+  /** עמודים שאין להם כתובת קנונית משלהם (404) */
+  canonical?: boolean;
+  ogType?: 'website' | 'article';
+  jsonLd?: object | object[];
 }
-const { title, description, noindex = false, jsonLd } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const {
+  title, description, noindex = false, canonical: withCanonical = true,
+  ogType = 'website', jsonLd,
+} = Astro.props;
+
+// trailingSlash: 'always' — הקנוני, הקישורים הפנימיים וה-sitemap חייבים
+// להסכים, אחרת כל קישור פנימי עובר דרך הפניית 307 (B1).
+const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : Astro.url.pathname + '/';
+const canonical = new URL(path, Astro.site).href;
+const ogImage = new URL('/og-default.png', Astro.site).href;
+
+/**
+ * JSON.stringify אינו מקודד `<`, ולכן גוף משרה שנכתב בממשק הצוות ומכיל
+ * `</script><script>…` היה נסגר מתוך בלוק ה-JSON-LD ורץ אצל כל מבקר (G1).
+ * מקודדים גם U+2028/U+2029, שהם מפרידי שורה חוקיים ב-JS ושוברים את הפענוח.
+ */
+function safeJsonLd(value: unknown): string {
+  // split/join ולא regex literal: תו `<` בתוך /.../ בתוך frontmatter של Astro
+  // שובר את המפרסר.
+  return JSON.stringify(value)
+    .split('<').join('\\u003c')
+    .split(' ').join('\\u2028')
+    .split(' ').join('\\u2029');
+}
+const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---
 <!doctype html>
 <html lang="he" dir="rtl">
@@ -20,23 +47,29 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {withCanonical && <link rel="canonical" href={canonical} />}
     {noindex && <meta name="robots" content="noindex, follow" />}
 
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:locale" content="he_IL" />
+    <meta property="og:site_name" content={SITE.shortName} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${SITE.shortName} — גיוס והשמה`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={ogImage} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" />
+    <!-- גופן מקומי: אין preconnect לדומיין חיצוני ואין דליפת IP לגוגל (B13) -->
+    <link rel="preload" href="/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
-    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    {jsonLdBlocks.map(block => (
+      <script type="application/ld+json" set:html={safeJsonLd(block)} />
+    ))}
   </head>
   <body>
     <a class="skip-link" href="#main">דילוג לתוכן</a>

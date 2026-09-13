@@ -1,0 +1,129 @@
+# CI לריפו ה-HR. שלוש אפליקציות, מיגרציות Postgres ושתי פונקציות קצה ב-Deno.
+# עד היום Cloudflare בנה ישירות מה-Git ולכן בנייה שבורה התגלתה רק בייצור.
+#
+# עקרון: ה-workflow מתאר את *מבנה* הריפו (סקריפטים ב-package.json, globs)
+# ולא רשימות קבצים קשיחות, כדי שמיגרציה/בדיקה/פונקציית קצה חדשה תיכלל
+# אוטומטית בלי לגעת כאן.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: בנייה, typecheck ו-drift של הסכימה
+    runs-on: ubuntu-latest
+    # הבנייה כאן היא בדיקת קומפילציה, לא פריסה: האתר הציבורי נבנה ממשרות
+    # הדמה בלי לגעת במסד. astro.config.mjs/jobs.ts חוסמים בנייה כזו כש-CI
+    # מוגדר (K2/K3), ולכן מדליקים כאן את דגל ההיתר המפורש. Cloudflare לעולם
+    # אינו מגדיר אותו, כך שההגנה על פריסת הייצור נשמרת.
+    env:
+      ALLOW_DEMO_BUILD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: install
+        run: npm ci
+
+      # האתר הציבורי: בלי DATABASE_URL הוא נבנה ממשרות הדמה שב-src/data/fixtures,
+      # ולכן הבנייה ב-CI אינה נוגעת במסד הייצור. PUBLIC_APPLY_ENDPOINT הוא
+      # ערך דמה — רק כדי שהטופס ייבנה עם action תקין.
+      - name: build public-site
+        run: npm run build:public
+        env:
+          PUBLIC_APPLY_ENDPOINT: https://example.invalid/functions/v1/apply
+          PUBLIC_SITE_URL: https://hr.ort-tech.co.il
+
+      # astro check = ה-typecheck היחיד של האתר הציבורי (שאר האפליקציות
+      # מריצות tsc -b כחלק מ-build). דורש @astrojs/check + typescript
+      # ב-devDependencies של @hr/public-site.
+      - name: typecheck public-site
+        run: npm run check --workspace=@hr/public-site
+
+      - name: build team-app
+        run: npm run build:team
+
+      - name: build candidate-app
+        run: npm run build:candidate
+
+      # supabase/schema.sql הוא שרשור המיגרציות. אם מישהו הוסיף מיגרציה
+      # ולא הריץ npm run db:schema — הקובץ המאוחד שב-DEPLOY מפנים אליו מיושן.
+      - name: schema.sql תואם את המיגרציות
+        run: |
+          npm run db:schema
+          git diff --exit-code -- supabase/schema.sql \
+            || { echo "::error file=supabase/schema.sql::schema.sql אינו תואם את supabase/migrations. הריצו npm run db:schema וקמטו את השינוי."; exit 1; }
+
+      # 5 פגיעויות ידועות נכון ל-2026-09, כולן נפתרות רק בשדרוגי major
+      # (astro@7, react-router-dom@7) — ראו docs/UPGRADES.md.
+      # continue-on-error נשאר עד שהשדרוגים האלה יבוצעו, ואז יש להסיר אותו.
+      - name: npm audit (production)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  db-test:
+    name: מיגרציות ובדיקות כללי עסק
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: psql client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      # scripts/db-test.sh במצב DATABASE_URL מריץ מיגרציות שאינן idempotent
+      # ובדיקות שמכניסות שורות. --yes-destroy הוא האישור המפורש לכך;
+      # כאן המסד הוא service container חד-פעמי.
+      - name: db-test
+        run: ./scripts/db-test.sh --yes-destroy
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+  edge-functions:
+    name: deno check לפונקציות הקצה
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # glob ולא רשימה קשיחה: פונקציה חדשה תחת supabase/functions/ נבדקת מעצמה.
+      # הפונקציות מייבאות מ-esm.sh, ולכן הצעד דורש רשת.
+      - name: deno check
+        run: |
+          shopt -s nullglob globstar
+          files=(supabase/functions/**/*.ts)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "לא נמצאו פונקציות קצה — מדלגים."
+            exit 0
+          fi
+          printf '→ %s\n' "${files[@]}"
+          deno check "${files[@]}"
+        shell: bash

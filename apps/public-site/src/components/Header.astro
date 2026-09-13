@@ -1,25 +1,21 @@
 ---
+import { SITE, NAV } from '../data/site';
 const path = Astro.url.pathname;
-const links = [
-  { href: '/',        label: 'בית' },
-  { href: '/jobs',    label: 'משרות' },
-  { href: '/about',   label: 'אודות' },
-  { href: '/contact', label: 'יצירת קשר' },
-];
+// תפריט אחד בלבד לכל האתר — מגיע מ-data/site.ts (N1).
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path.startsWith(href);
 ---
 <header class="site-header">
   <div class="page bar">
-    <a href="/" class="brand" aria-label="URSA GROUP — דף הבית">
+    <a href="/" class="brand" aria-label={`${SITE.shortName} — דף הבית`}>
       <picture>
         <source srcset="/ursa-logo-dark.png" media="(prefers-color-scheme: dark)" />
-        <img src="/ursa-logo.png" alt="URSA GROUP" class="brand-logo" width="140" height="40" />
+        <img src="/ursa-logo.png" alt={SITE.shortName} class="brand-logo" width="280" height="81" />
       </picture>
     </a>
     <nav aria-label="ניווט ראשי">
       <ul>
-        {links.map(l => (
+        {NAV.map(l => (
           <li>
             <a href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}>
               {l.label}
@@ -28,7 +24,7 @@ const isActive = (href: string) =>
         ))}
       </ul>
     </nav>
-    <a href="/jobs" class="btn btn-primary bar-cta">למשרות הפתוחות</a>
+    <a href="/jobs/" class="btn btn-primary bar-cta">למשרות הפתוחות</a>
   </div>
 </header>
 
@@ -44,11 +40,7 @@ const isActive = (href: string) =>
     min-block-size: 64px;
   }
   .brand { text-decoration: none; margin-inline-end: auto; display: inline-flex; align-items: center; }
-  .brand-logo { height: 34px; width: auto; display: block; }
-  .brand-mark {
-    font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--ink);
-  }
-  .brand-mark span { color: var(--brand); }
+  .brand-logo { block-size: 34px; inline-size: auto; display: block; }
   nav ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
   nav a {
     display: inline-block; padding: 8px 12px; border-radius: var(--radius-sm);

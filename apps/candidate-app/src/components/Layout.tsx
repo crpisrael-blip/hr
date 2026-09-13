@@ -21,19 +21,20 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { signOut } = useAuth();
   return (
     <div className="shell">
+      <a className="skip-link" href="#main">דילוג לתוכן הראשי</a>
       <header className="topbar">
         <img src="/ursa-logo.png" alt="URSA GROUP" className="brand" />
-        <button className="signout" onClick={signOut} aria-label="יציאה">
+        <button type="button" className="signout" onClick={signOut} aria-label="יציאה מהחשבון">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M15 12H4M9 7l-5 5 5 5M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4" />
           </svg>
         </button>
       </header>
 
-      <main className="content">{children}</main>
+      <main className="content" id="main" tabIndex={-1}>{children}</main>
 
-      <nav className="tabbar">
+      <nav className="tabbar" aria-label="ניווט ראשי">
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.to === '/'}
             className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>

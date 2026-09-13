@@ -1,27 +1,50 @@
 ---
-import { type Job, SCOPE_LABEL, isFresh, formatDate, excerpt } from '../data/jobs';
-interface Props { job: Job; }
-const { job } = Astro.props;
+import { type Job, SCOPE_LABEL, isFresh, formatDate, isoDate, excerpt } from '../data/jobs';
+interface Props {
+  job: Job;
+  /** רמת הכותרת בתוך היררכיית העמוד. ב-/jobs הכרטיסים הם תת-הכותרת של h1. */
+  headingLevel?: 2 | 3;
+}
+const { job, headingLevel = 3 } = Astro.props;
+const H = `h${headingLevel}` as 'h2' | 'h3';
 const scope = job.employment_scope ? SCOPE_LABEL[job.employment_scope] : null;
+const summary = excerpt(job.body);
 ---
 <article class="card"
   data-title={job.title}
+  data-body={summary}
+  data-company={job.company_name ?? ''}
   data-location={job.location ?? ''}
   data-scope={job.employment_scope ?? ''}>
-  <a class="hit" href={`/jobs/${job.slug}`} aria-label={`למשרה: ${job.title}`}></a>
+  <a class="hit" href={`/jobs/${job.slug}/`} aria-label={`למשרה: ${job.title}`}></a>
   <div class="top">
-    <h3>{job.title}</h3>
+    <H>{job.title}</H>
     {isFresh(job) && <span class="tag tag-new">חדש</span>}
   </div>
-  <ul class="meta" aria-label="פרטי משרה">
-    {job.location && <li>📍 {job.location}</li>}
-    {scope && <li>🕒 {scope}</li>}
-    {job.company_name && <li>🏢 {job.company_name}</li>}
+  <ul class="meta">
+    {job.location && (
+      <li>
+        <span aria-hidden="true">📍</span>
+        <span class="visually-hidden">מיקום:</span> {job.location}
+      </li>
+    )}
+    {scope && (
+      <li>
+        <span aria-hidden="true">🕒</span>
+        <span class="visually-hidden">היקף משרה:</span> {scope}
+      </li>
+    )}
+    {job.company_name && (
+      <li>
+        <span aria-hidden="true">🏢</span>
+        <span class="visually-hidden">חברה:</span> {job.company_name}
+      </li>
+    )}
   </ul>
-  <p class="excerpt">{excerpt(job.body)}</p>
+  <p class="excerpt">{summary}</p>
   <div class="foot">
-    <span class="date">פורסם {formatDate(job.published_at)}</span>
-    <span class="go">לפרטים ולהגשה ←</span>
+    <span class="date">פורסם <time datetime={isoDate(job.published_at)}>{formatDate(job.published_at)}</time></span>
+    <span class="go" aria-hidden="true">לפרטים ולהגשה ←</span>
   </div>
 </article>
 
@@ -41,7 +64,7 @@ const scope = job.employment_scope ? SCOPE_LABEL[job.employment_scope] : null;
   .hit { position: absolute; inset: 0; z-index: 1; }
   .hit:focus-visible { outline: none; }
   .top { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; }
-  h3 { margin: 0; font-size: 1.12rem; font-weight: 600; }
+  .top :global(h2), .top :global(h3) { margin: 0; font-size: 1.12rem; font-weight: 600; }
   .meta { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 0; padding: 0; color: var(--ink-mid); font-size: .88rem; }
   .excerpt { color: var(--ink-mid); font-size: .93rem; }
   .foot { display: flex; align-items: center; justify-content: space-between; margin-block-start: auto; padding-block-start: 4px; }

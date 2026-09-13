@@ -1,4 +1,4 @@
--- HR schema (0001..0021 merged for Supabase SQL Editor)
+-- HR schema (0001..0023 merged for Supabase SQL Editor)
 
 -- === 0001_foundation.sql ===
 -- 0001 · יסודות: סכמות, טיפוסים, משתמשים, הרשאות, הגדרות ויומן ביקורת
@@ -2385,5 +2385,1614 @@ begin
   where c.id = calc_id;
   return calc_id;
 end $$;
+
+notify pgrst, 'reload schema';
+
+-- === 0022_security_hardening.sql ===
+-- 0022 · הקשחת אבטחה: הרשאות, RLS מודע-היקף, יומן ביקורת והסתרת שדות כספיים.
+-- מטפל בממצאי הביקורת C1, C2, C3, H9, H10, H11, M3, M8, M9, M13, L5.
+--
+-- הרעיון המרכזי: עד כה מדיניות אחת גורפת (staff_all, 0008:41-52) נתנה לכל עובד
+-- פעיל CRUD מלא על כל טבלאות app — כולל התפקיד של עצמו, ההגדרות וההרשאות.
+-- כאן מפרקים אותה לארבע מדיניות נפרדות (קריאה/הוספה/עדכון/מחיקה), מוסיפים
+-- טבלאות שרק מנהלת כותבת אליהן, ומכניסים היקפי הרשאה (שלי/צוות/הכל) לתוך RLS.
+-- הקובץ idempotent: אפשר להריץ אותו שוב על אותו מסד.
+
+-- ============================================================================
+-- 1. עזרי היקף (C3) — מטריצת ההרשאות הופכת מנתונים מתים לכלל אכיפה
+-- ============================================================================
+
+-- הצוות של המשתמש המחובר (לצורך היקף "הצוות שלי").
+create or replace function app.my_team()
+returns uuid
+language sql stable security definer set search_path = app, auth, public as $$
+  select e.team_id from app.employees e
+  where e.user_id = auth.uid() and e.employment_status = 'active'
+  limit 1
+$$;
+
+-- ההיקף האפקטיבי של המשתמש המחובר למודול/פעולה:
+--   ברירת מחדל לתפקיד  ->  כללי פרופילים  ->  עקיפות פר משתמש.
+-- שלילה פר משתמש גוברת על הכול (אפיון, סעיף מטריצת ההרשאות, כלל 1).
+-- עקיפה שפג תוקפה אינה נספרת (כלל 5).
+-- אם אין אף שורה מתאימה מחזירים 'all' — כלומר ההתנהגות שהייתה עד היום,
+-- כדי שהוספת מודול חדש לא תנעל בשוגג את המערכת.
+create or replace function app.effective_scope(p_module text, p_action text)
+returns text
+language plpgsql stable security definer set search_path = app, auth, public as $$
+declare
+  v_mod   app.perm_module;
+  v_act   app.perm_action;
+  v_emp   app.employees%rowtype;
+  v_scope app.perm_scope;
+begin
+  begin
+    v_mod := p_module::app.perm_module;
+    v_act := p_action::app.perm_action;
+  exception when others then
+    return 'all';   -- מודול/פעולה שאינם במטריצה: לא חוסמים
+  end;
+
+  select * into v_emp from app.employees
+   where user_id = auth.uid() and employment_status = 'active'
+   limit 1;
+  if v_emp.id is null then return 'none'; end if;
+
+  -- מנהלת ומנהל על נשארים 'all' (אפיון, טבלת ברירות המחדל).
+  if v_emp.role in ('manager','superadmin') then return 'all'; end if;
+
+  if exists (
+    select 1 from app.permission_overrides o
+     where o.employee_id = v_emp.id and o.module = v_mod and o.action = v_act
+       and o.kind = 'deny'
+       and (o.valid_until is null or o.valid_until > now())
+  ) then
+    return 'none';
+  end if;
+
+  select max(s) into v_scope from (
+    select d.scope as s
+      from app.permission_defaults d
+     where d.role = v_emp.role and d.module = v_mod and d.action = v_act
+    union all
+    select r.scope
+      from app.permission_profile_rules r
+      join app.employee_permission_profiles ep on ep.profile_id = r.profile_id
+     where ep.employee_id = v_emp.id and r.module = v_mod and r.action = v_act
+    union all
+    select o.scope
+      from app.permission_overrides o
+     where o.employee_id = v_emp.id and o.module = v_mod and o.action = v_act
+       and o.kind = 'grant'
+       and (o.valid_until is null or o.valid_until > now())
+  ) x;
+
+  if v_scope is null then return 'all'; end if;
+  return v_scope::text;
+end $$;
+
+-- האם שורה שבבעלות p_owner נמצאת בהיקף p_scope עבור המשתמש p_me.
+-- שורה ללא אחראי (owner is null) נחשבת מאגר משותף — כך שמועמד שנוצר
+-- מהאתר הציבורי אינו הופך לבלתי ניתן לעריכה לאיש מלבד המנהלת.
+create or replace function app.owner_in_scope(
+  p_scope text, p_me uuid, p_my_team uuid, p_owner uuid)
+returns boolean
+language sql stable security definer set search_path = app, public as $$
+  select case
+    when p_scope is null   then true
+    when p_scope = 'all'   then true
+    when p_scope = 'none'  then false
+    when p_owner is null   then true
+    when p_scope = 'own'   then p_owner = p_me
+    when p_scope = 'team'  then p_owner = p_me
+                              or (p_my_team is not null and exists (
+                                    select 1 from app.employees o
+                                     where o.id = p_owner and o.team_id = p_my_team))
+    else true
+  end
+$$;
+
+-- ============================================================================
+-- 2. נעילת כרטיס העובד (C2) — אי אפשר לקדם את עצמך
+-- ============================================================================
+-- הטריגר חל על כל עדכון, גם כזה שעוקף RLS דרך PostgREST. הקשר ללא JWT
+-- (postgres מה-SQL Editor, service_role מפונקציות הקצה) מזוהה לפי
+-- auth.uid() is null ומורשה — שם ההגנה היא ההרשאה להתחבר בכלל.
+create or replace function app.guard_employee_privileges()
+returns trigger
+language plpgsql security definer set search_path = app, auth, public as $$
+begin
+  if auth.uid() is null then
+    return new;   -- הקשר שרת (service_role / SQL Editor)
+  end if;
+
+  if (new.role is distinct from old.role
+      or new.employment_status is distinct from old.employment_status
+      or new.user_id is distinct from old.user_id)
+     and not app.is_manager() then
+    raise exception 'שינוי תפקיד, סטטוס העסקה או חשבון משתמש שמור למנהלת בלבד';
+  end if;
+
+  if new.role = 'superadmin' and old.role is distinct from 'superadmin'
+     and not app.is_superadmin() then
+    raise exception 'רק מנהל על יכול להעניק תפקיד מנהל על';
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists guard_employee_privileges on app.employees;
+create trigger guard_employee_privileges before update on app.employees
+  for each row execute function app.guard_employee_privileges();
+
+-- M9: אותו חשבון auth אינו יכול להיות גם עובד וגם מועמד (אפיון, מודל המידע).
+create or replace function app.guard_user_identity()
+returns trigger
+language plpgsql security definer set search_path = app, auth, public as $$
+begin
+  if new.user_id is null then return new; end if;
+  if tg_table_name = 'employees' then
+    if exists (select 1 from app.candidates c where c.user_id = new.user_id) then
+      raise exception 'חשבון זה כבר משויך למועמד ואינו יכול לשמש כעובד';
+    end if;
+  else
+    if exists (select 1 from app.employees e where e.user_id = new.user_id) then
+      raise exception 'חשבון זה כבר משויך לעובד ואינו יכול לשמש כמועמד';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_user_identity on app.employees;
+create trigger guard_user_identity before insert or update of user_id on app.employees
+  for each row execute function app.guard_user_identity();
+drop trigger if exists guard_user_identity on app.candidates;
+create trigger guard_user_identity before insert or update of user_id on app.candidates
+  for each row execute function app.guard_user_identity();
+
+-- ============================================================================
+-- 3. יומן ביקורת (H9) — מהיום באמת נכתב אליו
+-- ============================================================================
+grant usage on schema audit to authenticated;
+grant select, insert on audit.events to authenticated;
+grant usage, select on sequence audit.events_id_seq to authenticated;
+grant usage on schema audit to service_role;
+grant all on audit.events to service_role;
+grant usage, select on sequence audit.events_id_seq to service_role;
+revoke update, delete, truncate on audit.events from public, authenticated;
+
+alter table audit.events enable row level security;
+drop policy if exists audit_insert_staff on audit.events;
+create policy audit_insert_staff on audit.events for insert to authenticated
+  with check ((select app.is_staff()) and actor_id = auth.uid());
+drop policy if exists audit_read_manager on audit.events;
+create policy audit_read_manager on audit.events for select to authenticated
+  using ((select app.is_manager()));
+
+-- טריגר גנרי: מי עשה, על מה, מה היה ומה נהיה.
+create or replace function audit.log_change()
+returns trigger
+language plpgsql security definer set search_path = app, audit, auth, public as $$
+declare
+  v_actor uuid := auth.uid();
+  v_label text;
+  v_old   jsonb;
+  v_new   jsonb;
+  v_key   text;
+begin
+  if v_actor is not null then
+    select e.full_name into v_label from app.employees e where e.user_id = v_actor limit 1;
+    -- actor_id מצביע ל-auth.users; אם המשתמש אינו שם (בדיקות) לא מפילים פעולה עסקית.
+    if not exists (select 1 from auth.users u where u.id = v_actor) then
+      v_actor := null;
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    v_old := to_jsonb(old);
+  elsif tg_op = 'INSERT' then
+    v_new := to_jsonb(new);
+  else
+    v_old := to_jsonb(old);
+    v_new := to_jsonb(new);
+  end if;
+
+  v_key := coalesce(v_new->>'id', v_old->>'id', v_new->>'key', v_old->>'key',
+                    v_new->>'stage', v_old->>'stage',
+                    v_new->>'employee_id', v_old->>'employee_id');
+
+  insert into audit.events (actor_id, actor_label, action, entity_type, entity_id, changes)
+  values (v_actor, v_label, lower(tg_op), tg_table_schema || '.' || tg_table_name, v_key,
+          jsonb_strip_nulls(jsonb_build_object('old', v_old, 'new', v_new)));
+  return null;
+end $$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'employees','settings','permission_defaults','permission_profiles',
+    'permission_profile_rules','employee_permission_profiles','permission_overrides',
+    'agreements','stage_exposure']
+  loop
+    execute format('drop trigger if exists audit_log on app.%I', t);
+    execute format(
+      'create trigger audit_log after insert or update or delete on app.%I
+         for each row execute function audit.log_change()', t);
+  end loop;
+end $$;
+
+-- ============================================================================
+-- 4. פירוק staff_all לארבע מדיניות (C2)
+-- ============================================================================
+-- קריאה: כל עובד פעיל. כתיבה: עובד פעיל, ובטבלאות ההגדרות/ההרשאות/המסחר —
+-- מנהלת בלבד. מחיקה: מנהלת, למעט טבלאות תפעוליות שהאפליקציה מוחקת מהן בפועל.
+-- כל קריאה ל-is_staff()/is_manager() עטופה ב-(select ...) כדי שתוערך פעם אחת
+-- לשאילתה ולא לכל שורה (M13).
+do $$
+declare
+  t          text;
+  wr         text;
+  del        text;
+  mgr_write  text[] := array[
+    'settings','teams','permission_defaults','permission_profiles',
+    'permission_profile_rules','employee_permission_profiles','permission_overrides',
+    'agreements','stage_exposure','automation_rules','job_publications'];
+  -- טבלאות עם מדיניות ייעודית משלהן (כאן או במיגרציות קודמות)
+  skip_tables text[] := array[
+    'dev_ideas','employee_documents','employee_feedback','custom_fields',
+    'job_stage_history','form_templates','form_instances','form_events',
+    'public_submission_log','employees','candidates','jobs','applications',
+    'application_stage_history'];
+  -- שורות תפעוליות שהצוות מוחק בעבודה השוטפת
+  staff_delete text[] := array[
+    'documents','document_analyses','candidate_consents','client_submissions',
+    'interviews','conversations','conversation_messages','activities',
+    'task_assignees','task_links','task_reminders','saved_jobs','job_alerts',
+    'outbound_messages','task_process_items'];
+begin
+  for t in select tablename from pg_tables where schemaname = 'app' order by tablename loop
+    execute format('alter table app.%I enable row level security', t);
+    execute format('drop policy if exists staff_all on app.%I', t);
+    continue when t = any(skip_tables);
+
+    wr  := case when t = any(mgr_write) then '(select app.is_manager())' else '(select app.is_staff())' end;
+    del := case when t = any(mgr_write) then '(select app.is_manager())'
+                when t = any(staff_delete) then '(select app.is_staff())'
+                else '(select app.is_manager())' end;
+
+    execute format('drop policy if exists staff_read on app.%I', t);
+    execute format('create policy staff_read on app.%I for select to authenticated using ((select app.is_staff()))', t);
+    execute format('drop policy if exists staff_write on app.%I', t);
+    execute format('create policy staff_write on app.%I for insert to authenticated with check (%s)', t, wr);
+    execute format('drop policy if exists staff_update on app.%I', t);
+    execute format('create policy staff_update on app.%I for update to authenticated using (%s) with check (%s)', t, wr, wr);
+    execute format('drop policy if exists row_delete on app.%I', t);
+    execute format('create policy row_delete on app.%I for delete to authenticated using (%s)', t, del);
+  end loop;
+end $$;
+
+-- ---------- עובדים ----------
+-- קריאה לכל הצוות (הממשק מציג שמות אחראים); הוספה ומחיקה למנהלת;
+-- עדכון למנהלת או לשורה של עצמי — והטריגר שלמעלה חוסם העלאת הרשאות.
+alter table app.employees enable row level security;
+drop policy if exists employees_read on app.employees;
+create policy employees_read on app.employees for select to authenticated
+  using ((select app.is_staff()));
+drop policy if exists employees_insert on app.employees;
+create policy employees_insert on app.employees for insert to authenticated
+  with check ((select app.is_manager()));
+drop policy if exists employees_update on app.employees;
+create policy employees_update on app.employees for update to authenticated
+  using ((select app.is_manager()) or user_id = auth.uid())
+  with check ((select app.is_manager()) or user_id = auth.uid());
+drop policy if exists employees_delete on app.employees;
+create policy employees_delete on app.employees for delete to authenticated
+  using ((select app.is_manager()));
+
+-- ---------- מועמדים, משרות ומועמדויות: RLS מודע-היקף (C3) ----------
+alter table app.candidates enable row level security;
+drop policy if exists candidates_read on app.candidates;
+create policy candidates_read on app.candidates for select to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('candidates','view')),
+           (select app.current_employee()), (select app.my_team()), owner_employee_id));
+drop policy if exists candidates_insert on app.candidates;
+create policy candidates_insert on app.candidates for insert to authenticated
+  with check ((select app.is_staff()) and (select app.effective_scope('candidates','create')) <> 'none');
+drop policy if exists candidates_update on app.candidates;
+create policy candidates_update on app.candidates for update to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('candidates','edit')),
+           (select app.current_employee()), (select app.my_team()), owner_employee_id))
+  with check ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('candidates','edit')),
+           (select app.current_employee()), (select app.my_team()), owner_employee_id));
+drop policy if exists candidates_delete on app.candidates;
+create policy candidates_delete on app.candidates for delete to authenticated
+  using ((select app.is_manager()));
+
+alter table app.jobs enable row level security;
+drop policy if exists jobs_read on app.jobs;
+create policy jobs_read on app.jobs for select to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('jobs','view')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id));
+drop policy if exists jobs_insert on app.jobs;
+create policy jobs_insert on app.jobs for insert to authenticated
+  with check ((select app.is_staff()) and (select app.effective_scope('jobs','create')) <> 'none');
+drop policy if exists jobs_update on app.jobs;
+create policy jobs_update on app.jobs for update to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('jobs','edit')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id))
+  with check ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('jobs','edit')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id));
+drop policy if exists jobs_delete on app.jobs;
+create policy jobs_delete on app.jobs for delete to authenticated
+  using ((select app.is_manager()));
+
+alter table app.applications enable row level security;
+drop policy if exists applications_read on app.applications;
+create policy applications_read on app.applications for select to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('applications','view')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id));
+drop policy if exists applications_insert on app.applications;
+create policy applications_insert on app.applications for insert to authenticated
+  with check ((select app.is_staff()) and (select app.effective_scope('applications','create')) <> 'none');
+drop policy if exists applications_update on app.applications;
+create policy applications_update on app.applications for update to authenticated
+  using ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('applications','edit')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id))
+  with check ((select app.is_staff()) and app.owner_in_scope(
+           (select app.effective_scope('applications','edit')),
+           (select app.current_employee()), (select app.my_team()), recruiter_id));
+drop policy if exists applications_delete on app.applications;
+create policy applications_delete on app.applications for delete to authenticated
+  using ((select app.is_manager()));
+
+-- ---------- היסטוריית שלבים: קריאה בלבד ללקוח (H9) ----------
+-- הכתיבה עוברת מהיום דרך app.set_application_stage (0023), בדיוק כמו
+-- job_stage_history שנכתב מטריגר בלבד (0019).
+alter table app.application_stage_history enable row level security;
+drop policy if exists ash_read on app.application_stage_history;
+create policy ash_read on app.application_stage_history for select to authenticated
+  using ((select app.is_staff()));
+revoke insert, update, delete on app.application_stage_history from authenticated;
+revoke update, delete on app.job_stage_history from authenticated;
+
+-- ---------- טפסים (M2) ----------
+-- מופע טופס מכיל ת"ז, פרטי בנק והצהרות בריאות. מהיום נחשף ליוצר ולמנהלת בלבד.
+alter table app.form_instances enable row level security;
+drop policy if exists form_instances_staff on app.form_instances;
+drop policy if exists form_instances_owner on app.form_instances;
+create policy form_instances_owner on app.form_instances for all to authenticated
+  using ((select app.is_manager()) or created_by = (select app.current_employee()))
+  with check ((select app.is_manager()) or created_by = (select app.current_employee()));
+
+alter table app.form_events enable row level security;
+drop policy if exists form_events_staff on app.form_events;
+drop policy if exists form_events_owner on app.form_events;
+create policy form_events_owner on app.form_events for all to authenticated
+  using ((select app.is_manager()) or exists (
+           select 1 from app.form_instances i
+            where i.id = instance_id and i.created_by = (select app.current_employee())))
+  with check ((select app.is_manager()) or exists (
+           select 1 from app.form_instances i
+            where i.id = instance_id and i.created_by = (select app.current_employee())));
+
+-- תבניות: קריאה לכל הצוות (צריך כדי לשלוח טופס), עריכה למנהלת.
+alter table app.form_templates enable row level security;
+drop policy if exists form_templates_staff on app.form_templates;
+drop policy if exists form_templates_read on app.form_templates;
+drop policy if exists form_templates_write on app.form_templates;
+create policy form_templates_read on app.form_templates for select to authenticated
+  using ((select app.is_staff()));
+create policy form_templates_write on app.form_templates for all to authenticated
+  using ((select app.is_manager())) with check ((select app.is_manager()));
+
+-- ============================================================================
+-- 5. קישור עובד — נעילת מסלול ההסלמה (C1)
+-- ============================================================================
+-- הפונקציה נועדה להרצה ידנית אחת מה-SQL Editor. היא נשארת, אבל:
+--   (א) ה-EXECUTE נשלל מ-public/anon/authenticated — אי אפשר לקרוא לה מ-REST.
+--   (ב) גם אם תוענק שוב בטעות, היא מסרבת אלא אם: אין אף עובד במערכת (bootstrap),
+--       או שהקורא מנהל על, או שזו הרצה ישירה מהמסד ללא JWT.
+-- current_user חסר ערך כאן: בפונקציית SECURITY DEFINER הוא תמיד בעל הפונקציה.
+-- לכן נבדקים session_user (רול ההתחברות האמיתי) ו-auth.uid().
+create or replace function app.link_employee(p_email text, p_name text, p_role app.user_role default 'manager')
+returns uuid
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_uid uuid; v_id uuid; v_any boolean;
+begin
+  select exists (select 1 from app.employees) into v_any;
+  if v_any
+     and not app.is_superadmin()
+     and not (auth.uid() is null and session_user in ('postgres','supabase_admin')) then
+    raise exception 'app.link_employee שמורה למנהל על או להרצה ישירה מהמסד';
+  end if;
+
+  select id into v_uid from auth.users where lower(email) = lower(p_email);
+  if v_uid is null then
+    raise exception 'לא נמצא משתמש עם הדוא"ל %. צור אותו קודם ב-Authentication.', p_email;
+  end if;
+  insert into app.employees (user_id, full_name, email, role)
+  values (v_uid, p_name, lower(p_email), p_role)
+  on conflict (email) do update
+    set user_id = excluded.user_id, full_name = excluded.full_name, role = excluded.role,
+        employment_status = 'active'
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- ניתוק חשבון משתמש מרשומת מועמד (H12) — מסלול התיקון כשקישור שגוי קרה.
+create or replace function app.unlink_candidate_user(p_candidate_id uuid)
+returns void
+language plpgsql security definer set search_path = app, auth, public as $$
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת מנתקת חשבון מועמד'; end if;
+  update app.candidates set user_id = null where id = p_candidate_id;
+end $$;
+
+-- ============================================================================
+-- 6. הרשאות הרצה והרשאות ברירת מחדל (H11, M3)
+-- ============================================================================
+-- 0017 ביטלה את ה-EXECUTE הגורף מ-PUBLIC אך לא קבעה ברירת מחדל, ולכן כל
+-- פונקציה שנוצרה אחריה חזרה להיות ניתנת להרצה ע"י anon. כאן נסגר גם העתיד.
+alter default privileges in schema app     revoke execute on functions from public;
+alter default privileges in schema finance revoke execute on functions from public;
+alter default privileges in schema audit   revoke execute on functions from public;
+
+-- ברירת המחדל הגורפת על טבלאות עתידיות (0008:37, 0009:8) פתחה כל טבלה חדשה
+-- לכל משתמש מחובר עוד לפני שנקבעה לה RLS. מבטלים; מעניקים במפורש פר טבלה.
+alter default privileges in schema app     revoke select, insert, update, delete on tables from authenticated;
+alter default privileges in schema finance revoke select, insert, update, delete on tables from authenticated;
+
+revoke execute on all functions in schema app     from public, anon;
+revoke execute on all functions in schema finance from public, anon;
+grant  execute on all functions in schema app     to authenticated, service_role;
+grant  execute on all functions in schema finance to authenticated, service_role;
+
+-- ארבע פונקציות ה-token הציבוריות בלבד ל-anon.
+grant execute on function app.form_open(text)          to anon;
+grant execute on function app.form_save(text, jsonb)   to anon;
+grant execute on function app.form_submit(text, jsonb) to anon;
+grant execute on function app.site_apply_form()        to anon;
+
+-- C1: אין דרך לקרוא ל-link_employee מהרשת.
+revoke execute on function app.link_employee(text, text, app.user_role) from public, anon, authenticated;
+grant  execute on function app.unlink_candidate_user(uuid) to authenticated;
+
+-- ============================================================================
+-- 7. הסתרת שדות כספיים ממגייס (H10)
+-- ============================================================================
+-- הרשאות עמודתיות אינן יכולות להבחין בין מגייס למנהלת (שניהם authenticated),
+-- לכן הטבלה יורדת מתחת לקרקע ובמקומה תצוגה: המנהלת רואה הכול, המגייס רואה
+-- את ההשמות שלו בלבד וללא שכר/אחוז/עמלה. שמות העמודות והסדר נשמרו, כך
+-- ששאילתות team-app הקיימות (כולל select *) ממשיכות לעבוד.
+do $$
+begin
+  if to_regclass('finance.placements_private') is null then
+    alter table finance.placements rename to placements_private;
+  end if;
+end $$;
+
+create or replace view finance.placements with (security_barrier = true) as
+select p.id,
+       p.application_id,
+       p.company_id,
+       p.recruiter_id,
+       p.agreement_id,
+       p.accepted_at,
+       p.expected_start_date,
+       p.verified_start_date,
+       case when (select app.is_manager()) then p.agreed_salary end       as agreed_salary,
+       p.commission_base,
+       case when (select app.is_manager()) then p.commission_pct end      as commission_pct,
+       case when (select app.is_manager()) then p.expected_commission end as expected_commission,
+       p.currency,
+       p.warranty_days,
+       p.warranty_ends_on,
+       p.status,
+       p.approved_by,
+       p.approved_at,
+       p.ended_reason,
+       p.created_by,
+       p.created_at,
+       p.updated_at
+from finance.placements_private p
+where (select app.is_manager())
+   or p.recruiter_id = (select app.current_employee());
+
+-- הטבלה עצמה נסגרת ללקוחות; כל כתיבה עוברת דרך פונקציות SECURITY DEFINER.
+revoke all on finance.placements_private from authenticated, anon;
+grant select on finance.placements to authenticated;
+grant all    on finance.placements to service_role;
+grant all    on finance.placements_private to service_role;
+
+-- ============================================================================
+-- 8. שלמות נתונים (M9) ואינדקסים (M13)
+-- ============================================================================
+create unique index if not exists employees_email_lower_uniq on app.employees (lower(email));
+
+alter table finance.placements_private drop constraint if exists placements_commission_pct_chk;
+alter table finance.placements_private add  constraint placements_commission_pct_chk
+  check (commission_pct > 0 and commission_pct <= 1000);
+alter table finance.placements_private drop constraint if exists placements_warranty_days_chk;
+alter table finance.placements_private add  constraint placements_warranty_days_chk
+  check (warranty_days >= 0);
+
+-- interviews.status היה טקסט חופשי; מצמצמים לערכים החוקיים בלבד.
+alter table app.interviews drop constraint if exists interviews_status_chk;
+alter table app.interviews add  constraint interviews_status_chk
+  check (status in ('scheduled','done','cancelled','no_show'));
+
+-- settings/stage_exposure: חותמת זמן ומי עדכן, אוטומטית.
+create or replace function app.touch_settings()
+returns trigger
+language plpgsql security definer set search_path = app, auth, public as $$
+begin
+  new.updated_at := now();
+  if auth.uid() is not null then new.updated_by := auth.uid(); end if;
+  return new;
+end $$;
+drop trigger if exists touch_settings on app.settings;
+create trigger touch_settings before update on app.settings
+  for each row execute function app.touch_settings();
+
+create or replace function app.touch_stage_exposure()
+returns trigger
+language plpgsql security definer set search_path = app, auth, public as $$
+begin
+  new.updated_at := now();
+  new.updated_by := coalesce(app.current_employee(), new.updated_by);
+  return new;
+end $$;
+drop trigger if exists touch_stage_exposure on app.stage_exposure;
+create trigger touch_stage_exposure before update on app.stage_exposure
+  for each row execute function app.touch_stage_exposure();
+
+-- עמודות מפתח זר ללא אינדקס — הכבדות שבהן (M13).
+create index if not exists bonus_lines_placement       on finance.bonus_calculation_lines (placement_id);
+create index if not exists bonus_lines_clawback        on finance.bonus_calculation_lines (clawback_id);
+create index if not exists placements_company          on finance.placements_private (company_id);
+create index if not exists placements_agreement        on finance.placements_private (agreement_id);
+create index if not exists placements_created_by       on finance.placements_private (created_by);
+create index if not exists clawback_employee           on finance.clawback_proposals (employee_id);
+create index if not exists clawback_calculation        on finance.clawback_proposals (calculation_id);
+create index if not exists receipt_alloc_invoice       on finance.receipt_allocations (invoice_id);
+create index if not exists bonus_calc_employee         on finance.bonus_calculations (employee_id);
+create index if not exists conversations_recruiter     on app.conversations (recruiter_id);
+create index if not exists tasks_parent                on app.tasks (parent_task_id);
+create index if not exists tasks_recurrence            on app.tasks (recurrence_id);
+create index if not exists tasks_automation_rule       on app.tasks (automation_rule_id);
+create index if not exists deletion_requests_candidate on app.deletion_requests (candidate_id);
+create index if not exists document_analyses_document  on app.document_analyses (document_id);
+create index if not exists saved_jobs_publication      on app.saved_jobs (publication_id);
+create index if not exists employees_manager           on app.employees (manager_id);
+create index if not exists teams_lead                  on app.teams (lead_employee_id);
+create index if not exists documents_uploaded_by       on app.documents (uploaded_by);
+create index if not exists agreements_created_by       on app.agreements (created_by);
+create index if not exists client_submissions_document on app.client_submissions (document_id);
+create index if not exists client_submissions_contact  on app.client_submissions (contact_id);
+create index if not exists conv_messages_document      on app.conversation_messages (document_id);
+
+-- ============================================================================
+-- 9. נרמול טלפון (L5)
+-- ============================================================================
+-- "0" הפך עד היום ל-"+972" ונשמר כמפתח כפילות. מהיום מוחזר null לכל מה
+-- שאינו מספר ישראלי תקין (קווי 8 ספרות / נייד 9 ספרות אחרי הקידומת),
+-- ומספר בינלאומי מפורש (+ ואחריו 8–15 ספרות) עובר כמות שהוא.
+create or replace function app.normalize_phone(raw text)
+returns text
+language sql immutable as $$
+  with d as (select regexp_replace(coalesce(raw, ''), '[^0-9+]', '', 'g') as v),
+  n as (
+    select case
+      when (select v from d) = ''         then null
+      when (select v from d) like '+972%' then '+972' || regexp_replace(substr((select v from d), 5), '^0', '')
+      when (select v from d) like '972%'  then '+972' || regexp_replace(substr((select v from d), 4), '^0', '')
+      when (select v from d) like '0%'    then '+972' || substr((select v from d), 2)
+      else (select v from d)
+    end as v
+  )
+  select case
+    when (select v from n) is null                       then null
+    when (select v from n) ~ '^\+972[2-9][0-9]{7,8}$'    then (select v from n)
+    when (select v from n) ~ '^\+(?!972)[1-9][0-9]{7,14}$' then (select v from n)
+    else null
+  end
+$$;
+
+-- ============================================================================
+-- 10. אחסון (M8)
+-- ============================================================================
+do $$
+begin
+  if to_regclass('storage.objects') is not null then
+    -- מסמכי מועמדים: צוות קורא רק מועמדים שבהיקף שלו, ולא את כל המאגר.
+    drop policy if exists staff_reads_docs on storage.objects;
+    create policy staff_reads_docs on storage.objects for select to authenticated
+      using (bucket_id = 'candidate-docs' and (select app.is_staff())
+             and exists (select 1 from app.candidates c
+                          where c.id::text = (storage.foldername(name))[1]
+                            and app.owner_in_scope(
+                                  (select app.effective_scope('candidates','view')),
+                                  (select app.current_employee()), (select app.my_team()),
+                                  c.owner_employee_id)));
+
+    -- מגייס יכול להעלות קו"ח למועמד שבהיקף שלו (עד היום לא היה מסלול כזה).
+    drop policy if exists staff_writes_docs on storage.objects;
+    create policy staff_writes_docs on storage.objects for insert to authenticated
+      with check (bucket_id = 'candidate-docs' and (select app.is_staff())
+             and exists (select 1 from app.candidates c
+                          where c.id::text = (storage.foldername(name))[1]
+                            and app.owner_in_scope(
+                                  (select app.effective_scope('candidates','edit')),
+                                  (select app.current_employee()), (select app.my_team()),
+                                  c.owner_employee_id)));
+
+    -- מחיקת קובץ של מועמד: המועמד עצמו (החלפת גרסה) או מנהלת.
+    drop policy if exists candidate_deletes_own on storage.objects;
+    create policy candidate_deletes_own on storage.objects for delete to authenticated
+      using (bucket_id = 'candidate-docs'
+             and ((storage.foldername(name))[1] = (select app.current_candidate())::text
+                  or (select app.is_manager())));
+
+    -- form-uploads: עד היום לא הייתה לאיש מדיניות insert, ולכן כל העלאה נכשלה.
+    drop policy if exists form_uploads_staff_write on storage.objects;
+    create policy form_uploads_staff_write on storage.objects for insert to authenticated
+      with check (bucket_id = 'form-uploads' and ((select app.is_staff()) or (select app.current_candidate()) is not null));
+    drop policy if exists form_uploads_mgr_delete on storage.objects;
+    create policy form_uploads_mgr_delete on storage.objects for delete to authenticated
+      using (bucket_id = 'form-uploads' and (select app.is_manager()));
+  end if;
+end $$;
+
+-- ============================================================================
+-- 11. מה נאכף מהיום במסד — ומה עדיין לא (C3)
+-- ============================================================================
+-- נאכף במסד:
+--   · רק עובד פעיל ומזוהה ניגש לסכמות app/finance, ורק דרך RLS.
+--   · תפקיד, סטטוס העסקה וחשבון המשתמש של עובד ניתנים לשינוי בידי מנהלת בלבד,
+--     ותפקיד מנהל על בידי מנהל על בלבד (טריגר, חל גם על PostgREST).
+--   · הגדרות, מטריצת ההרשאות, הסכמים, חשיפת שלבים, אוטומציות, צוותים ופרסומים:
+--     קריאה לצוות, כתיבה למנהלת.
+--   · מחיקה פיזית: מנהלת בלבד, למעט שורות תפעוליות; מחיקת מועמד מבוקרת דרך
+--     app.anonymize_candidate (0023).
+--   · היקף שלי/צוות/הכל על מועמדים, משרות ומועמדויות — נקרא ממטריצת ההרשאות
+--     בזמן אמת דרך app.effective_scope, כולל שלילה פר משתמש ותוקף.
+--   · שדות כספיים בהשמה מוסתרים ממי שאינו מנהלת (תצוגה במקום טבלה).
+--   · כל שינוי בכרטיס עובד, בהגדרות, בהרשאות, בהסכמים ובחשיפת השלבים נרשם
+--     ב-audit.events, שהוא append-only גם למי שמחובר ישירות למסד.
+-- עדיין לא נאכף במסד (דורש שכבת API, SPEC:133):
+--   · היקפים במודולים חיובים/התחשבנות/דוחות/ייבוא/אתר — שם ההפרדה היא עדיין
+--     מנהלת מול מגייס בלבד.
+--   · הסתרת שדות רגישים ברזולוציית שדה מעבר לשדות ההשמה.
+--   · כלל "אי אפשר להעניק יותר ממה שיש למעניק" (אפיון, כלל 3) — נבדק בממשק בלבד.
+--   · אימות דו-שלבי (SPEC:129) — הדגל קיים, האכיפה אינה במסד.
+
+-- === 0023_business_rules_fixes.sql ===
+-- 0023 · תיקוני כללי עסק ופונקציות RPC חדשות.
+-- מטפל בממצאי הביקורת H4, H5, H6, H7, H8, H12, M4, M5, M6, M7, M10, L4,
+-- ומוסיף את חמש הפונקציות שהאפליקציות נכתבות מולן.
+
+-- ============================================================================
+-- 0. עזרי זמן ואזור זמן (M10)
+-- ============================================================================
+-- date_trunc('month', now()) מחושב ב-UTC. בין 00:00 ל-03:00 שעון ישראל ביום
+-- הראשון בחודש זה מחזיר את החודש הקודם. כל תאריך עסקי נגזר מכאן.
+create or replace function app.today_il() returns date
+language sql stable as $$ select (now() at time zone 'Asia/Jerusalem')::date $$;
+
+create or replace function app.month_start_il(p_when date default null) returns date
+language sql stable as $$ select date_trunc('month', coalesce(p_when, app.today_il()))::date $$;
+
+-- ============================================================================
+-- 1. הגבלת קצב להגשות ציבוריות (H3)
+-- ============================================================================
+-- פונקציית הקצה שומרת רק גיבוב SHA-256 של ה-IP עם מלח, לעולם לא כתובת גולמית.
+create table if not exists app.public_submission_log (
+  id         bigserial primary key,
+  ip_hash    text        not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists public_submission_log_ip
+  on app.public_submission_log (ip_hash, created_at desc);
+alter table app.public_submission_log enable row level security;
+revoke all on app.public_submission_log from authenticated, anon, public;
+revoke all on sequence app.public_submission_log_id_seq from authenticated, anon, public;
+grant all on app.public_submission_log to service_role;
+grant all on sequence app.public_submission_log_id_seq to service_role;
+
+-- בודק ורושם באותה פעולה. מחזיר false כשעברו את המכסה.
+create or replace function app.public_submission_allowed(
+  p_ip_hash text, p_limit integer default 5, p_window_minutes integer default 10)
+returns boolean
+language plpgsql security definer set search_path = app, public as $$
+declare v_count integer;
+begin
+  if p_ip_hash is null or length(p_ip_hash) < 16 then
+    return true;   -- אין ממה לגזור מגביל; לא חוסמים הגשה אמיתית
+  end if;
+  delete from app.public_submission_log where created_at < now() - interval '1 day';
+  select count(*) into v_count from app.public_submission_log
+   where ip_hash = p_ip_hash
+     and created_at > now() - make_interval(mins => greatest(1, p_window_minutes));
+  if v_count >= greatest(1, p_limit) then return false; end if;
+  insert into app.public_submission_log (ip_hash) values (p_ip_hash);
+  return true;
+end $$;
+
+-- ============================================================================
+-- 2. מניעת משימת אוטומציה כפולה על אותה ישות (M5)
+-- ============================================================================
+-- האינדקס הקודם כלל parent_task_id בלבד, ושתי שורות עם NULL אינן מתנגשות —
+-- ולכן כל הגשה חוזרת יצרה משימה נוספת. מוסיפים מפתח ישות מפורש.
+alter table app.tasks add column if not exists automation_entity_id uuid;
+drop index if exists app.tasks_open_automation_uniq;
+create unique index if not exists tasks_open_automation_uniq
+  on app.tasks (automation_rule_id, coalesce(automation_entity_id, parent_task_id))
+  where automation_rule_id is not null
+    and coalesce(automation_entity_id, parent_task_id) is not null
+    and status in ('open','in_progress');
+create index if not exists tasks_automation_entity on app.tasks (automation_entity_id);
+
+-- ============================================================================
+-- 3. מכונת מצבים להשמה (H7, H8, M10)
+-- ============================================================================
+-- יצירת השמה: ההסכם חייב להיות של אותה חברה, בתוקף ליום הקבלה, והמועמדות
+-- חייבת להיות בשלב "התקבל".
+create or replace function app.create_placement(
+  p_application_id uuid, p_agreement_id uuid, p_agreed_salary numeric, p_expected_start date
+) returns uuid
+language plpgsql security definer set search_path = app, finance, public as $$
+declare
+  ag   app.agreements%rowtype;
+  appl app.applications%rowtype;
+  v_job_company uuid;
+  v_today date := app.today_il();
+  base numeric; expected numeric; v_id uuid; v_emp uuid;
+begin
+  if not app.is_staff() then raise exception 'לא מורשה'; end if;
+  if p_agreed_salary is null or p_agreed_salary <= 0 then
+    raise exception 'שכר מוסכם חייב להיות גדול מאפס';
+  end if;
+
+  select * into ag   from app.agreements   where id = p_agreement_id;
+  select * into appl from app.applications where id = p_application_id;
+  if ag.id is null or appl.id is null then raise exception 'הסכם או מועמדות לא נמצאו'; end if;
+
+  if appl.stage <> 'hired' then
+    raise exception 'אפשר ליצור השמה רק ממועמדות בשלב "התקבל" (השלב הנוכחי: %)', appl.stage;
+  end if;
+
+  select j.company_id into v_job_company from app.jobs j where j.id = appl.job_id;
+  if v_job_company is null then raise exception 'למועמדות אין משרה תקפה'; end if;
+  if ag.company_id <> v_job_company then
+    raise exception 'ההסכם שייך לחברה אחרת מזו של המשרה';
+  end if;
+  if ag.valid_from > v_today or (ag.valid_to is not null and ag.valid_to < v_today) then
+    raise exception 'ההסכם אינו בתוקף ליום הקבלה';
+  end if;
+
+  base     := p_agreed_salary * (case when ag.commission_base = 'annual' then 12 else 1 end);
+  expected := round(base * ag.commission_pct / 100, 2);
+  v_emp    := coalesce(appl.recruiter_id, app.current_employee());
+  if v_emp is null then raise exception 'אין מגייס זכאי להשמה'; end if;
+
+  insert into finance.placements_private (
+    application_id, company_id, recruiter_id, agreement_id, accepted_at, expected_start_date,
+    agreed_salary, commission_base, commission_pct, expected_commission, warranty_days,
+    status, created_by)
+  values (p_application_id, v_job_company, v_emp, p_agreement_id, v_today, p_expected_start,
+    p_agreed_salary, ag.commission_base, ag.commission_pct, expected, ag.warranty_days,
+    'pending_start', app.current_employee())
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- אימות תחילת עבודה: רק מהמצב 'ממתין לתחילה'.
+create or replace function app.verify_placement_start(p_placement_id uuid, p_start date)
+returns void language plpgsql security definer set search_path = app, finance, public as $$
+declare v_status finance.placement_status;
+begin
+  if not app.is_staff() then raise exception 'לא מורשה'; end if;
+  select status into v_status from finance.placements_private where id = p_placement_id;
+  if v_status is null then raise exception 'השמה לא נמצאה'; end if;
+  if v_status <> 'pending_start' then
+    raise exception 'אפשר לאמת תחילת עבודה רק להשמה שממתינה לתחילה (המצב הנוכחי: %)', v_status;
+  end if;
+  update finance.placements_private
+     set verified_start_date = p_start, status = 'working_warranty'
+   where id = p_placement_id;
+end $$;
+
+-- אישור השמה: רק אחרי שתקופת האחריות הסתיימה בפועל, ורק ממצב "בעבודה".
+create or replace function app.approve_placement(p_placement_id uuid)
+returns void language plpgsql security definer set search_path = app, finance, public as $$
+declare
+  pl finance.placements_private%rowtype; ag app.agreements%rowtype; sched_id uuid; r record;
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת מאשרת השמה'; end if;
+  select * into pl from finance.placements_private where id = p_placement_id;
+  if pl.id is null then raise exception 'השמה לא נמצאה'; end if;
+  if pl.status = 'approved' then return; end if;   -- כבר מאושרת
+  if pl.status <> 'working_warranty' then
+    raise exception 'אפשר לאשר רק השמה בתקופת אחריות פעילה (המצב הנוכחי: %)', pl.status;
+  end if;
+  if pl.verified_start_date is null then raise exception 'יש לאמת תחילת עבודה קודם'; end if;
+  if pl.warranty_ends_on is null or pl.warranty_ends_on > app.today_il() then
+    raise exception 'תקופת האחריות טרם הסתיימה (סיום צפוי: %)', pl.warranty_ends_on;
+  end if;
+
+  update finance.placements_private
+     set status = 'approved', approved_by = app.current_employee(), approved_at = now()
+   where id = p_placement_id;
+
+  if exists (select 1 from finance.payment_schedules where placement_id = p_placement_id) then
+    return; -- כבר קיים לוח
+  end if;
+
+  select * into ag from app.agreements where id = pl.agreement_id;
+  insert into finance.payment_schedules (placement_id, total_amount, installments)
+  values (p_placement_id, pl.expected_commission, ag.installments)
+  returning id into sched_id;
+
+  for r in select * from finance.build_schedule(pl.expected_commission, ag.installments,
+                                                app.month_start_il(), ag.payment_terms_days)
+  loop
+    insert into finance.invoices (schedule_id, seq, amount, currency, planned_issue_date, due_date, status)
+    values (sched_id, r.seq, r.amount, pl.currency, r.planned_issue_date, r.due_date, 'planned');
+  end loop;
+end $$;
+
+-- פתיחת הצעת קיזוז — הגרסה הפנימית, נקראת גם אוטומטית מכישלון השמה.
+-- H6: הסכום הוא סכום כל שורות הבונוס של אותה השמה, לא השורה הגדולה.
+create or replace function app.open_clawback_auto(p_placement uuid)
+returns uuid
+language plpgsql security definer set search_path = app, finance, public as $$
+declare v_emp uuid; v_amt numeric; v_calc uuid; v_id uuid;
+begin
+  select recruiter_id into v_emp from finance.placements_private where id = p_placement;
+  if v_emp is null then return null; end if;
+
+  select sum(l.amount), l.calculation_id into v_amt, v_calc
+    from finance.bonus_calculation_lines l
+   where l.placement_id = p_placement
+   group by l.calculation_id
+   order by sum(l.amount) desc
+   limit 1;
+
+  if v_amt is null then return null; end if;   -- לא שולם בונוס על ההשמה
+
+  insert into finance.clawback_proposals (placement_id, calculation_id, employee_id, proposed_amount, status)
+  values (p_placement, v_calc, v_emp, greatest(0, v_amt), 'open')
+  on conflict (placement_id) do nothing
+  returning id into v_id;
+
+  if v_id is null then
+    select id into v_id from finance.clawback_proposals where placement_id = p_placement;
+  end if;
+  return v_id;
+end $$;
+
+create or replace function app.open_clawback(p_placement uuid)
+returns uuid
+language plpgsql security definer set search_path = app, finance, public as $$
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת'; end if;
+  return app.open_clawback_auto(p_placement);
+end $$;
+
+-- כישלון השמה: מגייס רשאי לסמן כישלון לפני האישור בלבד; אחרי אישור — מנהלת.
+-- פותח אוטומטית הצעת קיזוז כשנרשם בונוס על ההשמה (אפיון, תרחיש 3).
+create or replace function app.fail_placement(p_placement_id uuid, p_status text, p_reason text)
+returns void language plpgsql security definer set search_path = app, finance, public as $$
+declare v_status finance.placement_status;
+begin
+  if not app.is_staff() then raise exception 'לא מורשה'; end if;
+  if p_status not in ('not_started','left_in_warranty','cancelled') then
+    raise exception 'סטטוס סיום לא חוקי';
+  end if;
+  if coalesce(nullif(trim(coalesce(p_reason,'')), ''), '') = '' then
+    raise exception 'חובה לציין סיבת סיום';
+  end if;
+
+  select status into v_status from finance.placements_private where id = p_placement_id;
+  if v_status is null then raise exception 'השמה לא נמצאה'; end if;
+  if v_status in ('not_started','left_in_warranty','cancelled') then
+    raise exception 'ההשמה כבר סגורה (המצב הנוכחי: %)', v_status;
+  end if;
+  if v_status = 'approved' and not app.is_manager() then
+    raise exception 'השמה מאושרת נסגרת בידי מנהלת בלבד';
+  end if;
+  if v_status not in ('pending_start','working_warranty','approved') then
+    raise exception 'מעבר לא חוקי ממצב %', v_status;
+  end if;
+
+  update finance.placements_private
+     set status = p_status::finance.placement_status, ended_reason = p_reason
+   where id = p_placement_id;
+
+  -- ביטול חיובים שטרם הופקו
+  update finance.invoices i set status = 'cancelled'
+   from finance.payment_schedules s
+   where s.id = i.schedule_id and s.placement_id = p_placement_id and i.status = 'planned';
+
+  -- הצעת קיזוז אוטומטית (אינה מקזזת דבר עד להחלטת המנהלת)
+  perform app.open_clawback_auto(p_placement_id);
+end $$;
+
+-- ============================================================================
+-- 4. מנוע בונוסים (H5, M10)
+-- ============================================================================
+-- עיגול בסוף החישוב ולא בכל שורה (אפיון, סעיף הבונוסים). השורות עצמן
+-- נשמרות ב-numeric(14,2) לצורך תצוגה, אך הסכום נגזר מהערכים המלאים.
+create or replace function finance.calc_bonus_lines(
+  p_metric   finance.bonus_metric,
+  p_target_a numeric,
+  p_target_b numeric,
+  p_pct1     numeric,
+  p_pct2     numeric,
+  p_input    finance.bonus_input[]
+) returns table (placement_id uuid, tier smallint, pct numeric, base numeric, amount numeric)
+language plpgsql immutable as $$
+declare
+  r        finance.bonus_input;
+  idx      integer := 0;
+  cum      numeric := 0;
+  top      numeric;
+  seg      numeric;
+begin
+  foreach r in array coalesce(p_input, '{}'::finance.bonus_input[]) loop
+    idx := idx + 1;
+
+    if p_metric = 'placements_count' then
+      placement_id := r.placement_id;
+      base         := r.commission;
+      if    idx <= p_target_a then tier := 0; pct := 0;
+      elsif idx <= p_target_b then tier := 1; pct := p_pct1;
+      else                         tier := 2; pct := p_pct2;
+      end if;
+      amount := r.commission * pct / 100;
+      return next;
+
+    else -- commission_sum
+      top := cum + r.commission;
+
+      seg := greatest(0, least(top, p_target_a) - cum);
+      if seg > 0 then
+        placement_id := r.placement_id; tier := 0; pct := 0;
+        base := seg; amount := 0; return next;
+      end if;
+
+      seg := greatest(0, least(top, p_target_b) - greatest(cum, p_target_a));
+      if seg > 0 then
+        placement_id := r.placement_id; tier := 1; pct := p_pct1;
+        base := seg; amount := seg * p_pct1 / 100; return next;
+      end if;
+
+      seg := greatest(0, top - greatest(cum, p_target_b));
+      if seg > 0 then
+        placement_id := r.placement_id; tier := 2; pct := p_pct2;
+        base := seg; amount := seg * p_pct2 / 100; return next;
+      end if;
+
+      cum := top;
+    end if;
+  end loop;
+end $$;
+
+-- חישוב/רענון בונוס חודשי.
+--  · מסרב לדרוס חישוב שכבר יצא מטיוטה (H5) — אחרת מחיקת שורות מאפסת סכום ששולם.
+--  · אינו מסנן השמות שנכשלו: הן נשארות בחישוב ומסומנות בהערה (אפיון).
+create or replace function app.compute_monthly_bonus(p_employee uuid, p_month date)
+returns uuid language plpgsql security definer set search_path = app, finance, public as $$
+declare
+  m0 date := date_trunc('month', p_month)::date;
+  m1 date := (date_trunc('month', p_month) + interval '1 month - 1 day')::date;
+  pl finance.bonus_plans%rowtype;
+  calc_id uuid; inp finance.bonus_input[];
+  v_status finance.bonus_status;
+  v_lines numeric; v_clawbacks numeric;
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת מחשבת בונוסים'; end if;
+
+  select c.status into v_status from finance.bonus_calculations c
+   where c.employee_id = p_employee and c.period_month = m0;
+  if v_status is not null and v_status <> 'draft' then
+    raise exception 'קיים חישוב במצב "%" לחודש זה. יש להחזיר אותו לטיוטה לפני חישוב מחדש.', v_status;
+  end if;
+
+  select * into pl from finance.bonus_plans
+   where employee_id = p_employee and valid_from <= m1 and (valid_to is null or valid_to >= m0)
+   order by version desc limit 1;
+  if pl.id is null then raise exception 'אין תוכנית תגמול בתוקף לחודש זה'; end if;
+
+  select array_agg((p.id, p.expected_commission, p.verified_start_date)::finance.bonus_input
+                   order by p.verified_start_date, p.id) into inp
+  from finance.placements_private p
+  where p.recruiter_id = p_employee
+    and p.verified_start_date between m0 and m1;
+
+  insert into finance.bonus_calculations (employee_id, period_month, plan_id, plan_version, status)
+  values (p_employee, m0, pl.id, pl.version, 'draft')
+  on conflict (employee_id, period_month) do update
+    set plan_id = excluded.plan_id, plan_version = excluded.plan_version, updated_at = now()
+  returning id into calc_id;
+
+  -- שורות מהשמות (שומרים שורות קיזוז שליליות)
+  delete from finance.bonus_calculation_lines where calculation_id = calc_id and placement_id is not null;
+  insert into finance.bonus_calculation_lines (calculation_id, placement_id, expected_commission, tier, pct, amount)
+  select calc_id, l.placement_id, l.base, l.tier, l.pct, round(l.amount, 2)
+  from finance.calc_bonus_lines(pl.metric, pl.target_a, pl.target_b, pl.pct_tier_1, pl.pct_tier_2,
+                                coalesce(inp,'{}'::finance.bonus_input[])) l
+  where l.placement_id is not null;
+
+  -- סימון השמות שנכשלו: נשארות בחישוב ומסומנות (אפיון, תרחיש 3).
+  update finance.bonus_calculation_lines l
+     set note = 'ההשמה נכשלה — נדרשת החלטת קיזוז'
+    from finance.placements_private p
+   where l.calculation_id = calc_id and l.placement_id = p.id
+     and p.status in ('not_started','left_in_warranty','cancelled');
+
+  -- עיגול בסוף: הסכום נגזר מהערכים המלאים ולא מסכום שורות מעוגלות.
+  select round(coalesce(sum(l.amount), 0), 2) into v_lines
+    from finance.calc_bonus_lines(pl.metric, pl.target_a, pl.target_b, pl.pct_tier_1, pl.pct_tier_2,
+                                  coalesce(inp,'{}'::finance.bonus_input[])) l
+   where l.placement_id is not null;
+  select coalesce(sum(amount), 0) into v_clawbacks
+    from finance.bonus_calculation_lines
+   where calculation_id = calc_id and clawback_id is not null;
+
+  update finance.bonus_calculations c set
+    metric_value = case when pl.metric = 'placements_count'
+                        then (select count(*)::numeric from unnest(coalesce(inp,'{}'::finance.bonus_input[])))
+                        else (select coalesce(sum(u.commission),0) from unnest(coalesce(inp,'{}'::finance.bonus_input[])) as u) end,
+    total_amount = v_lines + v_clawbacks
+  where c.id = calc_id;
+  return calc_id;
+end $$;
+
+-- מצב חישוב: אפשר לחזור אחורה לתיקון, אך לא מ"שולם" (M10).
+create or replace function app.set_bonus_status(p_calc uuid, p_status text)
+returns void language plpgsql security definer set search_path = app, finance, public as $$
+declare v_cur finance.bonus_status;
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת'; end if;
+  if p_status not in ('draft','review','approved','paid') then raise exception 'סטטוס לא חוקי'; end if;
+  select status into v_cur from finance.bonus_calculations where id = p_calc;
+  if v_cur is null then raise exception 'חישוב לא נמצא'; end if;
+  if v_cur = 'paid' and p_status <> 'paid' then
+    raise exception 'חישוב ששולם אינו חוזר למצב קודם';
+  end if;
+  update finance.bonus_calculations set status = p_status::finance.bonus_status,
+    approved_by = case when p_status='approved' then app.current_employee() else approved_by end,
+    approved_at = case when p_status='approved' then now() else approved_at end,
+    paid_at = case when p_status='paid' then now() else paid_at end,
+    updated_at = now()
+  where id = p_calc;
+end $$;
+
+-- החלטת מנהלת על קיזוז (H4, M10).
+--  · ה-case שהניב 'open'/'decided' הוסק כ-text ולכן כל קריאה נכשלה: נוסף cast.
+--  · 'none' נסגר סופית (אפיון: ויתור מודע), 'deferred' נשאר פתוח עם תאריך יעד.
+--  · שארית העיגול בפריסה נכנסת לחודש האחרון, כמו ב-build_schedule.
+create or replace function app.decide_clawback(
+  p_id uuid, p_treatment text, p_amount numeric, p_spread_months integer, p_defer date, p_reason text)
+returns void language plpgsql security definer set search_path = app, finance, public as $$
+declare
+  cb finance.clawback_proposals%rowtype;
+  m0 date := app.month_start_il();
+  months integer; i integer; per numeric; paid numeric := 0; amt numeric; calc_id uuid;
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת'; end if;
+  if p_treatment not in ('offset','spread','deferred','none') then raise exception 'טיפול לא חוקי'; end if;
+  select * into cb from finance.clawback_proposals where id = p_id;
+  if cb.id is null then raise exception 'הצעה לא נמצאה'; end if;
+  if cb.status = 'closed' then raise exception 'ההצעה כבר נסגרה'; end if;
+
+  if p_treatment = 'deferred' and p_defer is null then
+    raise exception 'דחייה מחייבת תאריך יעד';
+  end if;
+  if p_treatment = 'spread' and coalesce(p_spread_months, 0) < 1 then
+    raise exception 'פריסה מחייבת מספר חודשים';
+  end if;
+
+  amt := round(coalesce(p_amount, cb.proposed_amount, 0), 2);
+
+  update finance.clawback_proposals set
+    treatment      = p_treatment::finance.clawback_treatment,
+    decided_amount = amt,
+    spread_months  = case when p_treatment = 'spread' then p_spread_months else null end,
+    defer_until    = case when p_treatment = 'deferred' then p_defer else null end,
+    reason         = p_reason,
+    status         = (case when p_treatment = 'deferred' then 'open' else 'decided' end)::finance.clawback_status,
+    decided_by     = app.current_employee(),
+    decided_at     = now()
+  where id = p_id;
+
+  if p_treatment in ('offset','spread') then
+    months := case when p_treatment = 'spread' then greatest(1, coalesce(p_spread_months, 1)) else 1 end;
+    per    := round(amt / months, 2);
+    for i in 0 .. months - 1 loop
+      -- שארית העיגול לחודש האחרון, כך שסכום הקיזוזים שווה בדיוק לסכום שהוחלט.
+      if i = months - 1 then per := amt - paid; end if;
+      paid := paid + per;
+
+      insert into finance.bonus_calculations (employee_id, period_month, status)
+      values (cb.employee_id, (m0 + make_interval(months => i))::date, 'draft')
+      on conflict (employee_id, period_month) do update set updated_at = now()
+      returning id into calc_id;
+
+      insert into finance.bonus_calculation_lines (calculation_id, clawback_id, amount, note)
+      values (calc_id, p_id, -per, 'קיזוז השמה שנכשלה');
+
+      update finance.bonus_calculations c set total_amount =
+        (select coalesce(sum(amount),0) from finance.bonus_calculation_lines where calculation_id = calc_id)
+      where c.id = calc_id;
+    end loop;
+    update finance.clawback_proposals set status = 'closed' where id = p_id;
+  elsif p_treatment = 'none' then
+    -- ויתור מודע: ההצעה נסגרת ואינה חוזרת לרשימת הפתוחות (אפיון).
+    update finance.clawback_proposals set status = 'closed' where id = p_id;
+  end if;
+end $$;
+
+-- ============================================================================
+-- 5. מעברי שלב במועמדות (SPEC:590, M9, H9)
+-- ============================================================================
+-- טבלת המעברים חיה עד היום רק בדפדפן (apps/team-app/src/lib/stages.ts).
+-- כאן היא נכנסת למסד, ונאכפת גם על עדכון ישיר מ-PostgREST.
+create or replace function app.allowed_stage_transition(
+  p_from app.application_stage, p_to app.application_stage)
+returns boolean
+language sql immutable as $$
+  select case
+    when p_from = p_to then true
+    -- שלב סופי: רק פתיחה מחדש, וחוזרים ל"סינון"
+    when p_from in ('rejected','withdrawn','job_cancelled') then p_to = 'screening'
+    -- קידום לשלב הבא ברצף העבודה
+    when array_position(array['new','screening','initial_call','submitted_to_client',
+                              'interview','offer','hired']::app.application_stage[], p_to)
+       = array_position(array['new','screening','initial_call','submitted_to_client',
+                              'interview','offer','hired']::app.application_stage[], p_from) + 1 then true
+    -- סגירה מכל שלב עבודה שאינו "התקבל"
+    when p_to in ('rejected','withdrawn','job_cancelled') and p_from <> 'hired' then true
+    else false
+  end
+$$;
+
+-- BEFORE: אכיפת המעבר ותחזוקת stage_changed_at (לא מהדפדפן).
+create or replace function app.applications_stage_guard()
+returns trigger language plpgsql set search_path = app, public as $$
+begin
+  if new.stage is distinct from old.stage then
+    if not app.allowed_stage_transition(old.stage, new.stage) then
+      raise exception 'מעבר שלב לא חוקי: % -> %', old.stage, new.stage;
+    end if;
+    new.stage_changed_at := now();
+  end if;
+  return new;
+end $$;
+drop trigger if exists applications_stage_guard on app.applications;
+create trigger applications_stage_guard before update on app.applications
+  for each row execute function app.applications_stage_guard();
+
+-- AFTER: רישום ההיסטוריה מהמסד בלבד (הדפדפן כבר אינו רשאי לכתוב לטבלה).
+create or replace function app.applications_log_stage()
+returns trigger language plpgsql security definer set search_path = app, public as $$
+begin
+  if new.stage is distinct from old.stage then
+    insert into app.application_stage_history (application_id, from_stage, to_stage, reason, changed_by)
+    values (new.id, old.stage, new.stage,
+            nullif(coalesce(current_setting('app.stage_note', true), ''), ''),
+            app.current_employee());
+  end if;
+  return null;
+end $$;
+drop trigger if exists applications_log_stage on app.applications;
+create trigger applications_log_stage after update on app.applications
+  for each row execute function app.applications_log_stage();
+
+-- ה-RPC שהאפליקציה קוראת: בודק הרשאה והיקף, מעדכן ורושם היסטוריה.
+create or replace function app.set_application_stage(
+  p_application_id uuid, p_stage app.application_stage, p_note text default null)
+returns void
+language plpgsql security definer set search_path = app, public as $$
+declare a app.applications%rowtype;
+begin
+  if not app.is_staff() then raise exception 'לא מורשה'; end if;
+  select * into a from app.applications where id = p_application_id;
+  if a.id is null then raise exception 'מועמדות לא נמצאה'; end if;
+  if not app.owner_in_scope(app.effective_scope('applications','edit'),
+                            app.current_employee(), app.my_team(), a.recruiter_id) then
+    raise exception 'המועמדות אינה בהיקף ההרשאה שלך';
+  end if;
+  if a.stage = p_stage then return; end if;
+  if not app.allowed_stage_transition(a.stage, p_stage) then
+    raise exception 'מעבר שלב לא חוקי: % -> %', a.stage, p_stage;
+  end if;
+
+  perform set_config('app.stage_note', coalesce(p_note, ''), true);
+  update app.applications
+     set stage = p_stage,
+         close_reason = case when p_stage::text in ('rejected','withdrawn','job_cancelled')
+                             then coalesce(p_note, close_reason) else close_reason end
+   where id = p_application_id;
+  perform set_config('app.stage_note', '', true);
+end $$;
+
+-- ============================================================================
+-- 6. משימות (RPC ללוח ולכרטיס)
+-- ============================================================================
+-- מיפוי בין מצב המשימה למצב האישי של מקבל המשימה.
+create or replace function app.task_personal_of(p_status app.task_status)
+returns app.assignee_status language sql immutable as $$
+  select case p_status
+    when 'done'        then 'done'
+    when 'in_progress' then 'in_progress'
+    when 'cancelled'   then 'removed'
+    else 'pending' end::app.assignee_status
+$$;
+
+-- שינוי מצב המשימה עצמה (גרירה בלוח). מיישר את המצב האישי כדי שהלוח
+-- והכרטיס לא יציגו דברים סותרים.
+create or replace function app.set_task_status(p_task_id uuid, p_status app.task_status)
+returns void
+language plpgsql security definer set search_path = app, public as $$
+declare v_cur app.task_status;
+begin
+  if not app.is_staff() then raise exception 'לא מורשה'; end if;
+  select status into v_cur from app.tasks where id = p_task_id;
+  if v_cur is null then raise exception 'משימה לא נמצאה'; end if;
+
+  update app.tasks
+     set status = p_status,
+         completed_at = case when p_status = 'done' then coalesce(completed_at, now()) else null end
+   where id = p_task_id;
+
+  if p_status = 'done' then
+    update app.task_assignees
+       set personal_status = 'done', done_at = coalesce(done_at, now())
+     where task_id = p_task_id and personal_status <> 'removed';
+  elsif p_status in ('open','in_progress') then
+    update app.task_assignees
+       set personal_status = app.task_personal_of(p_status), done_at = null
+     where task_id = p_task_id and personal_status = 'done';
+  end if;
+end $$;
+
+-- סימון אישי: מעדכן את המצב האישי ומחשב מחדש את מצב המשימה לפי כלל ההשלמה.
+create or replace function app.set_my_task_status(p_task_id uuid, p_status app.task_status)
+returns app.task_status
+language plpgsql security definer set search_path = app, public as $$
+declare
+  v_me uuid := app.current_employee();
+  t app.tasks%rowtype;
+  v_active integer; v_done integer; v_new app.task_status;
+begin
+  if v_me is null then raise exception 'לא מורשה'; end if;
+  select * into t from app.tasks where id = p_task_id;
+  if t.id is null then raise exception 'משימה לא נמצאה'; end if;
+  if not exists (select 1 from app.task_assignees where task_id = p_task_id and employee_id = v_me) then
+    raise exception 'המשימה אינה מוקצית לך';
+  end if;
+
+  update app.task_assignees
+     set personal_status = app.task_personal_of(p_status),
+         done_at = case when p_status = 'done' then now() else null end
+   where task_id = p_task_id and employee_id = v_me;
+
+  select count(*) filter (where personal_status <> 'removed'),
+         count(*) filter (where personal_status = 'done')
+    into v_active, v_done
+  from app.task_assignees where task_id = p_task_id;
+
+  v_new := t.status;
+  if t.status not in ('cancelled') then
+    if t.completion_rule = 'any_assignee' and v_done >= 1 then v_new := 'done';
+    elsif t.completion_rule = 'all_assignees' and v_active > 0 and v_done = v_active then v_new := 'done';
+    elsif v_done > 0 or p_status = 'in_progress' then v_new := 'in_progress';
+    else v_new := 'open';
+    end if;
+  end if;
+
+  if v_new is distinct from t.status then
+    update app.tasks
+       set status = v_new,
+           completed_at = case when v_new = 'done' then coalesce(completed_at, now()) else null end
+     where id = p_task_id;
+  end if;
+  return v_new;
+end $$;
+
+-- ============================================================================
+-- 7. טופס ההגשה באתר
+-- ============================================================================
+-- דגל is_site_apply הוא יחיד (אינדקס ייחודי חלקי). כיבוי והדלקה באותה
+-- טרנזקציה, אחרת עדכון מהדפדפן נכשל על האינדקס.
+create or replace function app.set_site_apply_form(p_template_id uuid)
+returns void
+language plpgsql security definer set search_path = app, public as $$
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת קובעת את טופס ההגשה באתר'; end if;
+  update app.form_templates set is_site_apply = false where is_site_apply;
+  if p_template_id is not null then
+    update app.form_templates set is_site_apply = true where id = p_template_id;
+    if not found then raise exception 'תבנית לא נמצאה'; end if;
+  end if;
+end $$;
+
+-- ============================================================================
+-- 8. מחיקה מבוקרת של מועמד (M4)
+-- ============================================================================
+-- אין מחיקה פיזית עם cascade. הרשומה נשארת כשלד סטטיסטי, ה-PII נמחק,
+-- והפעולה מתועדת בבקשת מחיקה וביומן הביקורת.
+create or replace function app.anonymize_candidate(p_candidate_id uuid)
+returns void
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_docs integer;
+begin
+  if not app.is_manager() then raise exception 'רק מנהלת מבצעת מחיקה מבוקרת'; end if;
+  if not exists (select 1 from app.candidates where id = p_candidate_id) then
+    raise exception 'מועמד לא נמצא';
+  end if;
+
+  select count(*) into v_docs from app.documents where candidate_id = p_candidate_id;
+  delete from app.documents where candidate_id = p_candidate_id;
+  update app.conversation_messages m
+     set body = 'ההודעה נמחקה לבקשת המועמד'
+    from app.conversations c
+   where c.id = m.conversation_id and c.candidate_id = p_candidate_id;
+
+  update app.candidates set
+    full_name        = 'מועמד/ת שהוסר/ה',
+    phone_normalized = null,
+    phone_raw        = null,
+    email            = null,
+    skills           = null,
+    preferences      = '{}'::jsonb,
+    custom           = '{}'::jsonb,
+    desired_salary   = null,
+    availability     = null,
+    user_id          = null,
+    anonymized_at    = now()
+  where id = p_candidate_id;
+
+  insert into app.deletion_requests (candidate_id, channel, verified_by, status, completed_at,
+                                     what_removed, what_kept)
+  values (p_candidate_id, 'system', app.current_employee(), 'done', now(),
+          format('שם, טלפון, דוא"ל, כישורים, העדפות ו-%s מסמכים', v_docs),
+          'מועמדויות והשמות ללא פרטים מזהים, לצורכי דיווח והתחשבנות');
+
+  insert into audit.events (actor_id, actor_label, action, entity_type, entity_id, changes)
+  values (auth.uid(),
+          (select full_name from app.employees where id = app.current_employee()),
+          'anonymize', 'app.candidates', p_candidate_id::text,
+          jsonb_build_object('documents_removed', v_docs));
+end $$;
+
+-- ============================================================================
+-- 9. אזור המועמד — הקשחה (H12, M6, M7)
+-- ============================================================================
+-- H12: קישור לפי דוא"ל מותר רק לרשומה שנוצרה בידי הצוות או בייבוא.
+-- רשומה שנוצרה מהאתר הציבורי (source='website') מכילה דוא"ל שאיש לא אימת,
+-- ולכן תוקף שמגיש עם הטלפון של הקורבן והדוא"ל שלו לא יקבל עליה בעלות.
+create or replace function app.claim_candidate_profile()
+returns uuid
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_uid uuid; v_email text; v_phone text; v_norm text; v_id uuid;
+begin
+  v_uid := auth.uid();
+  if v_uid is null then raise exception 'לא מחובר'; end if;
+
+  if exists (select 1 from app.employees e where e.user_id = v_uid) then
+    raise exception 'חשבון עובד אינו יכול להיות מועמד';
+  end if;
+
+  select id into v_id from app.candidates
+   where user_id = v_uid and anonymized_at is null limit 1;
+  if v_id is not null then return v_id; end if;
+
+  select email, phone into v_email, v_phone from auth.users where id = v_uid;
+  v_norm := app.normalize_phone(v_phone);
+
+  select id into v_id from app.candidates c
+   where c.user_id is null and c.anonymized_at is null
+     and (
+       (v_norm is not null and c.phone_normalized = v_norm)
+       or (v_email is not null and lower(c.email) = lower(v_email)
+           and coalesce(c.source, '') not in ('website','public_apply'))
+     )
+   order by (v_norm is not null and c.phone_normalized = v_norm) desc
+   limit 1;
+
+  if v_id is not null then
+    update app.candidates set user_id = v_uid where id = v_id;
+  end if;
+  return v_id;
+end $$;
+
+-- M6: נתיב אחסון נבדק בפועל (ולא רק בתחילית), שם הקובץ מוגבל.
+create or replace function app.add_my_document(
+  p_kind app.document_kind, p_storage_path text, p_file_name text, p_mime text, p_size bigint)
+returns uuid
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_cand uuid; v_max_mb numeric; v_allowed text[]; v_ver int; v_id uuid; v_name text;
+begin
+  v_cand := app.current_candidate();
+  if v_cand is null then raise exception 'אין פרופיל מועמד מקושר'; end if;
+  if p_kind not in ('cv', 'cover_letter', 'certificate', 'other') then
+    raise exception 'סוג מסמך לא מורשה להעלאה עצמית';
+  end if;
+  if p_size is null or p_size <= 0 then raise exception 'קובץ ריק'; end if;
+
+  v_name := left(regexp_replace(coalesce(p_file_name, 'file'), '[\r\n\t]', '', 'g'), 200);
+  if v_name = '' then v_name := 'file'; end if;
+
+  select (value #>> '{}')::numeric into v_max_mb from app.settings where key = 'files.max_size_mb';
+  select array(select jsonb_array_elements_text(value)) into v_allowed
+    from app.settings where key = 'files.allowed_mime';
+
+  if v_allowed is not null and array_length(v_allowed, 1) is not null
+     and not (p_mime = any(v_allowed)) then
+    raise exception 'סוג הקובץ אינו נתמך';
+  end if;
+  if v_max_mb is not null and p_size > v_max_mb * 1024 * 1024 then
+    raise exception 'הקובץ גדול מהמותר';
+  end if;
+
+  -- הנתיב חייב להיות בדיוק בתיקיית המועמד, ללא '..' וללא תווי בקרה.
+  if p_storage_path is null
+     or p_storage_path <> (v_cand::text || '/' || regexp_replace(p_storage_path, '^[^/]*/', ''))
+     or p_storage_path like '%..%'
+     or p_storage_path ~ '[[:cntrl:]]'
+     or length(p_storage_path) > 500 then
+    raise exception 'נתיב אחסון לא תקין';
+  end if;
+
+  -- האובייקט חייב להתקיים בפועל (רק כשסכמת storage זמינה, כלומר על Supabase).
+  if to_regclass('storage.objects') is not null then
+    if not exists (select 1 from storage.objects o
+                    where o.bucket_id = 'candidate-docs' and o.name = p_storage_path) then
+      raise exception 'הקובץ לא נמצא באחסון';
+    end if;
+  end if;
+
+  select coalesce(max(version), 0) + 1 into v_ver
+    from app.documents where candidate_id = v_cand and kind = p_kind;
+
+  insert into app.documents
+    (candidate_id, kind, version, storage_path, file_name, mime_type, size_bytes, uploaded_by, file_check)
+  values
+    (v_cand, p_kind, v_ver, p_storage_path, v_name, p_mime, p_size, auth.uid(), 'pending')
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- M7: הודעה מוגבלת באורך ובקצב.
+create or replace function app.send_my_message(p_application_id uuid, p_body text)
+returns uuid
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_cand uuid; v_conv uuid; v_recruiter uuid; v_id uuid; v_body text; v_recent integer;
+begin
+  v_cand := app.current_candidate();
+  if v_cand is null then raise exception 'אין פרופיל מועמד מקושר'; end if;
+  v_body := trim(coalesce(p_body, ''));
+  if v_body = '' then raise exception 'הודעה ריקה'; end if;
+  if length(v_body) > 4000 then raise exception 'ההודעה ארוכה מדי (עד 4000 תווים)'; end if;
+  if not coalesce((select value = 'true'::jsonb from app.settings where key = 'candidate_area.chat_enabled'), true) then
+    raise exception 'השיחה מושבתת';
+  end if;
+
+  select count(*) into v_recent
+    from app.conversations c
+    join app.conversation_messages m on m.conversation_id = c.id
+   where c.candidate_id = v_cand and m.sender_type = 'candidate'
+     and m.created_at > now() - interval '10 minutes';
+  if v_recent >= 20 then raise exception 'נשלחו יותר מדי הודעות. נסו שוב בעוד כמה דקות.'; end if;
+
+  select a.recruiter_id into v_recruiter from app.applications a
+    where a.id = p_application_id and a.candidate_id = v_cand;
+  if not found then raise exception 'מועמדות לא נמצאה'; end if;
+
+  select id into v_conv from app.conversations where application_id = p_application_id;
+  if v_conv is null then
+    insert into app.conversations (candidate_id, application_id, recruiter_id, last_message_at)
+    values (v_cand, p_application_id, v_recruiter, now())
+    returning id into v_conv;
+  end if;
+
+  insert into app.conversation_messages (conversation_id, sender_type, sender_user_id, body)
+  values (v_conv, 'candidate', auth.uid(), v_body)
+  returning id into v_id;
+
+  update app.conversations set last_message_at = now(), status = 'open' where id = v_conv;
+  return v_id;
+end $$;
+
+-- M7: ערכים לא תקינים מקבלים הודעה בעברית במקום שגיאת cast של Postgres;
+-- דוא"ל נערך רק כשהוא זהה לדוא"ל שהמועמד אימת בכניסה.
+create or replace function app.update_my_profile(p jsonb)
+returns jsonb
+language plpgsql security definer set search_path = app, auth, public as $$
+declare v_cand uuid; v_ed text[]; v_salary numeric; v_email text; v_auth_email text;
+begin
+  v_cand := app.current_candidate();
+  if v_cand is null then raise exception 'אין פרופיל מועמד מקושר'; end if;
+
+  select array(select jsonb_array_elements_text(value)) into v_ed
+    from app.settings where key = 'candidate_area.editable_fields';
+  v_ed := coalesce(v_ed, array[]::text[]);
+
+  if 'desired_salary' = any(v_ed) and p ? 'desired_salary' then
+    if nullif(p->>'desired_salary', '') is null then
+      v_salary := null;
+    elsif p->>'desired_salary' ~ '^[0-9]+(\.[0-9]{1,2})?$' then
+      v_salary := (p->>'desired_salary')::numeric;
+    else
+      raise exception 'שכר מבוקש חייב להיות מספר';
+    end if;
+  end if;
+
+  if 'email' = any(v_ed) and p ? 'email' then
+    v_email := lower(nullif(trim(p->>'email'), ''));
+    select lower(u.email) into v_auth_email from auth.users u where u.id = auth.uid();
+    if v_email is not null and v_email is distinct from v_auth_email then
+      raise exception 'אפשר לעדכן רק את הדוא"ל שאומת בכניסה. לשינוי כתובת יש לפנות למגייס.';
+    end if;
+  end if;
+
+  update app.candidates c set
+    full_name = case
+      when 'full_name' = any(v_ed) and nullif(p->>'full_name', '') is not null
+      then left(p->>'full_name', 120) else c.full_name end,
+    email = case
+      when 'email' = any(v_ed) and p ? 'email' and v_email is not null
+      then v_email else c.email end,
+    availability = case
+      when 'availability' = any(v_ed) and p ? 'availability'
+      then left(nullif(p->>'availability', ''), 120) else c.availability end,
+    desired_salary = case
+      when 'desired_salary' = any(v_ed) and p ? 'desired_salary'
+      then v_salary else c.desired_salary end,
+    preferences = case
+      when 'preferences' = any(v_ed) and p ? 'preferences'
+      then coalesce(p->'preferences', '{}'::jsonb) else c.preferences end
+  where c.id = v_cand;
+
+  return app.my_profile();
+end $$;
+
+-- ============================================================================
+-- 10. הרשאות הרצה (חזרה על מדיניות 0022 גם לפונקציות שנוצרו כאן)
+-- ============================================================================
+revoke execute on all functions in schema app     from public, anon;
+revoke execute on all functions in schema finance from public, anon;
+grant  execute on all functions in schema app     to authenticated, service_role;
+grant  execute on all functions in schema finance to authenticated, service_role;
+
+grant execute on function app.form_open(text)          to anon;
+grant execute on function app.form_save(text, jsonb)   to anon;
+grant execute on function app.form_submit(text, jsonb) to anon;
+grant execute on function app.site_apply_form()        to anon;
+
+-- פונקציות שאינן נקודת קצה ללקוח.
+revoke execute on function app.link_employee(text, text, app.user_role) from public, anon, authenticated;
+revoke execute on function app.open_clawback_auto(uuid) from public, anon, authenticated;
+revoke execute on function app.public_submission_allowed(text, integer, integer) from public, anon, authenticated;
+grant  execute on function app.public_submission_allowed(text, integer, integer) to service_role;
+
+-- חמש הפונקציות שהאפליקציות נכתבות מולן — למשתמש מחובר בלבד.
+grant execute on function app.set_site_apply_form(uuid)                                    to authenticated;
+grant execute on function app.set_task_status(uuid, app.task_status)                       to authenticated;
+grant execute on function app.set_my_task_status(uuid, app.task_status)                    to authenticated;
+grant execute on function app.set_application_stage(uuid, app.application_stage, text)     to authenticated;
+grant execute on function app.anonymize_candidate(uuid)                                    to authenticated;
 
 notify pgrst, 'reload schema';

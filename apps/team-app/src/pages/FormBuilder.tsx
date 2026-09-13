@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { RECIPIENTS, FILING_TARGETS, MAPPABLE, FORM_CATEGORIES, columnsForTable } from '../lib/entities';
 import PageHead from '../components/PageHead';
+import { toUserMessage } from '../lib/errors';
 
 const TYPES: [string, string][] = [
   ['text','טקסט קצר'], ['textarea','טקסט ארוך'], ['number','מספר'], ['date','תאריך'], ['time','שעה'],
@@ -28,6 +29,7 @@ export default function FormBuilder() {
   const [filingCategory, setFilingCategory] = useState('');
   const [status, setStatus] = useState('draft');
   const [siteApply, setSiteApply] = useState(false);
+  const [wasSiteApply, setWasSiteApply] = useState(false);
   const [fields, setFields] = useState<Field[]>([]);
   const [maps, setMaps] = useState<MapRow[]>([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
@@ -38,7 +40,7 @@ export default function FormBuilder() {
       if (error || !data) { setErr('התבנית לא נמצאה'); return; }
       setName(data.name ?? ''); setDescription(data.description ?? ''); setRecipient(data.recipient_type);
       setFilingTarget(data.filing_target ?? 'general'); setFilingCategory(data.filing_category ?? ''); setStatus(data.status);
-      setSiteApply(!!data.is_site_apply);
+      setSiteApply(!!data.is_site_apply); setWasSiteApply(!!data.is_site_apply);
       setFields((data.definition?.fields ?? []) as Field[]); setMaps((data.field_map ?? []) as MapRow[]);
     });
   }, [id, editing]);
@@ -54,23 +56,28 @@ export default function FormBuilder() {
     if (!name.trim()) { setErr('נא להזין שם לטופס.'); return; }
     for (const f of fields) if (!['heading','paragraph'].includes(f.type) && !f.label.trim()) { setErr('לכל שדה צריך שם.'); return; }
     setBusy(true);
+    // ★ הדגל is_site_apply אינו נשמר ישירות — הוא נקבע אטומית דרך ה-RPC
+    //   app.set_site_apply_form, כדי שכשל בשמירה לא ישאיר את האתר בלי טופס.
     const body = {
       name: name.trim(), description: description.trim() || null, recipient_type: recipient,
       definition: { fields: fields.map((f, i) => ({ ...f, order: i })) },
       field_map: maps.filter(m => m.field_key && m.table && m.column),
       filing_target: filingTarget, filing_category: filingCategory.trim() || null, status,
-      is_site_apply: siteApply,
     };
-    // רק תבנית אחת יכולה לשמש כטופס ההגשה באתר — מכבים אחרות לפני השמירה.
-    if (siteApply) {
-      const clr = await supabase.from('form_templates').update({ is_site_apply: false }).eq('is_site_apply', true);
-      if (clr.error) { setErr('כשל בכיבוי טופס ההגשה הקודם: ' + clr.error.message); setBusy(false); return; }
-    }
     const res = editing
       ? await supabase.from('form_templates').update(body).eq('id', id).select('id').single()
       : await supabase.from('form_templates').insert(body).select('id').single();
+    if (res.error) { setBusy(false); setErr(toUserMessage(res.error)); return; }
+    // קביעת/ביטול טופס ההגשה באתר בפעולה אחת ואטומית.
+    if (siteApply) {
+      const r = await supabase.rpc('set_site_apply_form', { p_template_id: res.data.id });
+      if (r.error) { setBusy(false); setErr('הטופס נשמר, אך הגדרתו כטופס ההגשה באתר נכשלה: ' + toUserMessage(r.error)); return; }
+    } else if (wasSiteApply) {
+      // התבנית שהחזיקה את הדגל בוטלה — מנקים כדי שלא יישאר טופס הגשה שגוי.
+      const r = await supabase.rpc('set_site_apply_form', { p_template_id: null });
+      if (r.error) { setBusy(false); setErr('הטופס נשמר, אך ביטול טופס ההגשה נכשל: ' + toUserMessage(r.error)); return; }
+    }
     setBusy(false);
-    if (res.error) { setErr(res.error.message); return; }
     nav('/forms');
   }
 

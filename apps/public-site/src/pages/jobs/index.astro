@@ -2,23 +2,25 @@
 import Base from '../../layouts/Base.astro';
 import JobCard from '../../components/JobCard.astro';
 import { loadJobs, locationsOf, SCOPE_LABEL } from '../../data/jobs';
+import { SITE } from '../../data/site';
 const jobs = await loadJobs();
 const locations = locationsOf(jobs);
 const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] as string[];
+const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרות`);
 ---
 <Base
-  title="משרות פתוחות — URSA GROUP"
+  title={`משרות פתוחות — ${SITE.shortName}`}
   description="כל המשרות הפתוחות שלנו במקום אחד. חיפוש וסינון לפי מיקום והיקף משרה.">
   <div class="page wrap">
     <header class="head">
       <h1>משרות פתוחות</h1>
-      <p class="count"><span id="count">{jobs.length}</span> משרות</p>
+      <p class="count" id="count" aria-live="polite">{countLabel(jobs.length)}</p>
     </header>
 
     <div class="filters" role="search">
       <div class="field grow">
-        <label class="visually-hidden" for="q">חיפוש חופשי</label>
-        <input type="search" id="q" placeholder="חיפוש לפי תפקיד או מילת מפתח…" autocomplete="off" />
+        <label class="visually-hidden" for="q">חיפוש לפי תפקיד, חברה או מילת מפתח</label>
+        <input type="search" id="q" placeholder="חיפוש לפי תפקיד, חברה או מילת מפתח…" autocomplete="off" />
       </div>
       <div class="field">
         <label class="visually-hidden" for="loc">מיקום</label>
@@ -40,7 +42,7 @@ const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] a
       <p class="empty">אין כרגע משרות פתוחות. חזרו בקרוב.</p>
     ) : (
       <div class="grid" id="grid">
-        {jobs.map(job => <JobCard job={job} />)}
+        {jobs.map(job => <JobCard job={job} headingLevel={2} />)}
       </div>
     )}
     <p class="empty" id="noresults" hidden>לא נמצאו משרות שתואמות את הסינון. נסו להרחיב את החיפוש.</p>
@@ -55,18 +57,24 @@ const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] a
   const count = document.getElementById('count')!;
   const noResults = document.getElementById('noresults')!;
 
+  const label = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרות`);
+
   function apply() {
     const term = q.value.trim().toLowerCase();
     let shown = 0;
     for (const c of cards) {
-      const okText = !term || (c.dataset.title ?? '').toLowerCase().includes(term);
+      // החיפוש מבטיח "מילת מפתח" ולכן סורק גם את התקציר ואת שם החברה,
+      // לא רק את שם התפקיד.
+      const haystack = [c.dataset.title, c.dataset.body, c.dataset.company, c.dataset.location]
+        .join(' ').toLowerCase();
+      const okText = !term || haystack.includes(term);
       const okLoc = !loc.value || c.dataset.location === loc.value;
       const okScope = !scope.value || c.dataset.scope === scope.value;
       const show = okText && okLoc && okScope;
       c.hidden = !show;
       if (show) shown++;
     }
-    count.textContent = String(shown);
+    count.textContent = label(shown);
     noResults.hidden = shown !== 0;
   }
   [q, loc, scope].forEach(el => el.addEventListener('input', apply));

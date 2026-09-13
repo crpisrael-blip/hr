@@ -10,8 +10,16 @@
 ## 1. Supabase — מסד נתונים
 
 ### 1.1 מיגרציות SQL ✅ (רובן רצו)
-כל הטבלאות קיימות. אם משהו לא עובד, ודאי שכל המיגרציות רצו לפי הסדר ב-SQL Editor:
-`0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019`.
+כל הטבלאות קיימות. אם משהו לא עובד, ודאי שכל המיגרציות ב-`supabase/migrations/`
+רצו ב-SQL Editor **לפי סדר מספרי**, מ-`0001` ומעלה. הרשימה כאן עצרה פעם
+ב-`0019` — יש לוודא שגם `0020` ו-`0021` (תיקוני חישוב הבונוס) וכל מיגרציה
+שנוספה אחריהן (`0022` ומעלה) רצו בייצור.
+
+הרשימה כאן לא תתוחזק ידנית: `ls supabase/migrations/` הוא מקור האמת, ובכל
+מיגרציה חדשה יש להריץ אותה כאן ואז `npm run db:schema` בריפו.
+
+> ⚠️ `supabase/schema.sql` המאוחד מיועד ל**מסד חדש וריק בלבד** — הוא אינו
+> idempotent. על מסד קיים מריצים רק את המיגרציות החדשות, אחת-אחת.
 
 ### 1.2 שגיאת הבונוס ✅ תוקנה
 "column definition list is redundant" — הגורם היה בגוף `compute_monthly_bonus`
@@ -27,8 +35,21 @@
 ### 2.1 פונקציית `apply` ✅ פרוסה בגרסה העדכנית
 אומת: GET מחזיר `{"fields":[]}`, POST מגיע למסד, CORS תקין מ-`hr.ort-tech.co.il`.
 - הסוד `SERVICE_ROLE_KEY` = הערך `sb_secret_...` — ✅ מוגדר.
-- דומיינים מורשים (CORS) בקוד: `hr.ort-tech.co.il`, `my.hr.ort-tech.co.il`,
-  `hr-public-site.menahemtzik1.workers.dev`; דומיין נוסף — דרך הסוד `APPLY_ALLOW_ORIGIN`.
+- דומיינים מורשים (CORS) בקוד: `hr.ort-tech.co.il`, `my.hr.ort-tech.co.il`.
+- **`APPLY_ALLOW_ORIGIN` — סוד רשות.** דומיין **אחד** נוסף שמורשה לשלוח את
+  הטופס, כולל הסכמה (`https://…`). ריק = רק הדומיינים שבקוד. משמש לסביבת
+  preview, לכתובת `*.workers.dev` זמנית לפני חיבור הדומיין המותאם, או
+  למיגרציה לדומיין חדש — במקום לערוך קוד ולפרוס מחדש.
+  מוגדר ב-Edge Functions → Secrets; **אינו דורש פריסה מחדש** של הפונקציה.
+  > הכתובת האישית `hr-public-site.menahemtzik1.workers.dev` הוסרה מהקוד —
+  > היא קשרה את הייצור לחשבון Cloudflare פרטי. אם היא עדיין נדרשת לבדיקה,
+  > מקומה כאן, ויש לנקות אותה כשהדומיין המותאם מחובר.
+  אימות:
+  ```bash
+  curl -si -X OPTIONS https://jsxkwosjtjdypwedzxwx.supabase.co/functions/v1/apply \
+    -H 'Origin: https://hr.ort-tech.co.il' \
+    -H 'Access-Control-Request-Method: POST' | grep -i access-control-allow-origin
+  ```
 - לפריסה מחדש בעתיד: Dashboard → Edge Functions → `apply` → להדביק את
   `supabase/functions/apply/index.ts` → Deploy.
 
@@ -71,6 +92,12 @@ Authentication → Emails → SMTP Settings:
 ---
 
 ## 5. Cloudflare Workers — אתר ציבורי (`hr-public-site`) ✅ מוגדר
+
+> **שלושת הפרויקטים הם Workers (Static Assets), לא Pages.** זה מה שבלוק
+> `[assets]` שב-`wrangler.toml` מגדיר, ובלוח הבקרה הם יושבים תחת
+> Workers & Pages → **Workers**. תיעוד קודם קרא להם Pages — לא נכון, תוקן.
+> טבלת הבנייה המלאה (Root directory, Build command, Output directory):
+> `docs/DEPLOY.md` סעיף 0.
 משתני הסביבה (Settings → Environment variables → Production):
 | משתנה | ערך |
 |---|---|
@@ -92,7 +119,7 @@ Authentication → Emails → SMTP Settings:
 
 ---
 
-## 6. Cloudflare Pages — אפליקציות הצוות/המועמד ✅ פועלות
+## 6. Cloudflare Workers — אפליקציות הצוות/המועמד ✅ פועלות
 `hr-app` (צוות) ו-`my.hr` (מועמד) עובדות. אחרי כל דחיפה לענף — Cloudflare בונה
 מחדש; לראות שינויים חדשים צריך גם **רענון קשיח** בדפדפן (Ctrl+Shift+R).
 משתני הסביבה שלהן (כבר מוגדרים):
@@ -100,6 +127,9 @@ Authentication → Emails → SMTP Settings:
 VITE_SUPABASE_URL=https://jsxkwosjtjdypwedzxwx.supabase.co
 VITE_SUPABASE_ANON_KEY=<sb_publishable_...>
 ```
+בשתיהן `NODE_VERSION=22` (תואם ל-`.node-version` ול-`engines.node`).
+משתני `VITE_*` נצרבים לתוך הבנדל ונחשפים לדפדפן — **anon בלבד, לעולם לא
+service-role ולא `DATABASE_URL`**.
 
 ---
 
