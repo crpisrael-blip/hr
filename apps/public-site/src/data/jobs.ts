@@ -105,7 +105,15 @@ async function fetchJobs(): Promise<Job[]> {
       select slug, title, body, location, employment_scope, company_name, published_at
       from app.published_jobs`;
     console.log(`[jobs] נצרבו ${rows.length} משרות מהמסד`);
-    return sortJobs([...rows]);
+    // postgres.js מחזיר timestamptz כאובייקט Date. הטיפוס (ומשרות הדמה) הם
+    // מחרוזת, וקוד שמצפה למחרוזת (למשל xml() בסייטמאפ) נופל על Date. מנרמלים.
+    const norm = rows.map(r => ({
+      ...r,
+      published_at: r.published_at != null
+        ? new Date(r.published_at as unknown as string | Date).toISOString()
+        : r.published_at,
+    }));
+    return sortJobs(norm);
   } finally {
     await sql.end({ timeout: 5 });
   }

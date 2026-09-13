@@ -4,7 +4,7 @@ import { loadJobs } from '../data/jobs';
 const XML_ESC: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
 };
-const xml = (s: string) => s.replace(/[&<>"']/g, c => XML_ESC[c]);
+const xml = (s: string) => String(s).replace(/[&<>"']/g, c => XML_ESC[c]);
 
 export const GET: APIRoute = async ({ site }) => {
   const base = (site ?? new URL('https://hr.ort-tech.co.il')).origin;
