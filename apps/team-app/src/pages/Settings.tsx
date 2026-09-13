@@ -46,7 +46,7 @@ export default function Settings() {
 
       {tab==='users' && (
         <div className="card" style={{ overflowX: 'auto' }}>
-          <table>
+          <table style={{ minWidth: 560 }}>
             <thead><tr><th>שם</th><th>דוא״ל</th><th>תפקיד</th><th>מצב</th></tr></thead>
             <tbody>{emps.map(e => (
               <tr key={e.id}>
@@ -65,7 +65,7 @@ export default function Settings() {
 
       {tab==='stages' && (
         <div className="card" style={{ overflowX: 'auto' }}>
-          <table>
+          <table style={{ minWidth: 760 }}>
             <thead><tr><th>שלב פנימי</th><th>נחשף למועמד</th><th>תווית למועמד</th><th>טקסט הסבר</th><th>מה המועמד רואה</th></tr></thead>
             <tbody>{stages.map(s => (
               <tr key={s.stage}>
