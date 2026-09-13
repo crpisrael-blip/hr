@@ -46,7 +46,10 @@ body { font-size:16px; background:#f0f9fd; }
 .topbar .ava { width:44px; height:44px; background:#b5d8f5; color:#075494; }
 .content { padding:22px 28px; min-width:0; }
 .home-shell .content { padding:0; }
-.home-shell .topbar { position:absolute; top:0; left:0; width:49%; z-index:5; }
+/* בעמוד הבית זהות המשתמש כבר מוצגת בכרטיס שבסרגל הצד (שם + תפקיד).
+   topbar כפול היה מרחף מעל ה-hero ובמצב RTL נוחת במרכז המסך — מוסתר בדסקטופ.
+   במובייל הסרגל מתקפל ולכן ה-topbar חוזר (ראו בלוק ה-820px). */
+.home-shell .topbar { display:none; }
 .skip-link { position:fixed; top:-100px; right:24px; z-index:100; padding:12px 20px; background:white; border-radius:10px; }
 .skip-link:focus { top:12px; }
 .hero { position:relative; min-height:295px; padding:88px 36px 32px; background:#e9f7fc url('/recruitment-office.webp') center top/cover no-repeat; overflow:hidden; }
@@ -61,7 +64,9 @@ body { font-size:16px; background:#f0f9fd; }
 .hero-secondary { font-size:14px; color:#12497f; text-decoration:none; white-space:nowrap; }
 .hero-secondary:hover { text-decoration:underline; }
 .hero-script { position:absolute; left:46%; top:82px; font-family:'Segoe Print','Brush Script MT',cursive; font-style:italic; font-size:26px; color:#0a2e6d; line-height:1.02; transform:rotate(-14deg); text-align:center; margin:0; }
-.hero-words { position:absolute; right:5%; top:58px; font-size:19px; line-height:1.75; color:#145b89; text-align:right; margin:0; }
+/* מעל התמונה הבהירה טקסט כהה נבלע. כרטיס בהיר מטושטש נותן ניגודיות
+   קבועה ומראה מכוון, במקום מילים "מרחפות" שלא נקראות. */
+.hero-words { position:absolute; right:5%; top:52px; font-size:19px; line-height:1.7; color:#0b466e; font-weight:600; text-align:right; margin:0; padding:14px 18px; border-radius:16px; background:linear-gradient(180deg,#ffffffe0,#f2fbfdca); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 8px 22px #0a3a5c24; }
 .hero-ribbon { position:absolute; width:680px; height:300px; border:32px solid #27b8c34a; border-radius:50%; right:-145px; top:-194px; transform:rotate(28deg); }
 .dashboard-workspace { position:relative; padding:0 28px 16px; margin-top:-10px; z-index:3; }
 .tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); direction:ltr; gap:14px; margin-bottom:14px; }
@@ -155,7 +160,7 @@ input[type=email],input[type=tel] { direction:ltr; text-align:start; }
   .nav-item { min-height:42px; flex-shrink:0; gap:8px; padding:8px 12px; flex-direction:row; font-size:14px; }
   .nav-item svg { width:20px; height:20px; }
   .promo { display:none; } .user-chip { position:absolute; left:16px; top:12px; width:auto; padding:0; } .user-chip .who { display:none; } .user-chip .ava { width:36px; height:36px; }
-  .home-shell .topbar { position:relative; width:100%; background:#eaf6fc; }
+  .home-shell .topbar { display:flex; position:relative; width:100%; background:#eaf6fc; }
   .topbar { height:64px; padding:12px 16px; gap:14px; }
   .search { max-width:none; } .topbar .ava { width:36px; height:36px; }
   .hero { padding:28px 20px; min-height:250px; background-position:64% center; }
