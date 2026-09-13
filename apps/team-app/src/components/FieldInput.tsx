@@ -27,6 +27,8 @@ export default function FieldInput({ field, value, onChange, companies }:
       return <label>{lbl}<input type="number" dir="ltr" value={value ?? ''} onChange={e => onChange(e.target.value)} required={field.required} />{help}</label>;
     case 'date':
       return <label>{lbl}<input type="date" value={value ?? ''} onChange={e => onChange(e.target.value)} required={field.required} />{help}</label>;
+    case 'datetime':
+      return <label>{lbl}<input type="datetime-local" value={value ?? ''} onChange={e => onChange(e.target.value)} required={field.required} />{help}</label>;
     case 'boolean':
       return <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} style={{ width: 18, height: 18 }} />{lbl}</label>;

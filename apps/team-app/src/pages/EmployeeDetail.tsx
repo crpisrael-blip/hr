@@ -1,17 +1,21 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth, isManager } from '../lib/auth';
-import { ASSIGNABLE_ROLES, EMP_STATUS, EMPLOYEE_DOC_KIND, ROLE, formatDate, fmtSize, label, safeFileName } from '../lib/format';
+import { useAuth, isManager, isSuperadmin } from '../lib/auth';
+import { EMPLOYEE_DOC_KIND, ROLE, formatDate, fmtSize, label, safeFileName } from '../lib/format';
 import { ALLOWED_UPLOAD_ACCEPT, ALLOWED_UPLOAD_MIME, MAX_UPLOAD_MB } from '../lib/config';
 import { useLoad, unwrap } from '../lib/useLoad';
 import { toUserMessage } from '../lib/errors';
+import { effectiveFields, EMPLOYEE_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
+import type { CustomField } from '../components/CustomFields';
+import FieldInput from '../components/FieldInput';
+import FormLayoutEditor from '../components/FormLayoutEditor';
 import PageHead from '../components/PageHead';
 import Dialog from '../components/Dialog';
-import { CustomFieldsEdit } from '../components/CustomFields';
 import { Msg, Loading } from '../components/Msg';
 
 const BUCKET = 'employee-docs';
+const SPAN: Record<string, number> = { full: 6, half: 3, third: 2 };
 
 interface EmployeeRow {
   id: string; full_name: string; email: string; phone: string | null; role: string;
@@ -33,6 +37,7 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { employee: me } = useAuth();
   const canManage = isManager(me);
+  const canBuild = isSuperadmin(me);
   const isSelf = me?.id === id;
   const [form, setForm] = useState<EmployeeRow | null>(null);
   const [err, setErr] = useState(''); const [saved, setSaved] = useState('');
@@ -42,6 +47,20 @@ export default function EmployeeDetail() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
+  const [custom, setCustom] = useState<CustomField[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  const fields = useMemo(() => effectiveFields(EMPLOYEE_BUILTINS, custom, slots), [custom, slots]);
+  async function reloadMeta() {
+    const [cf, lay] = await Promise.all([
+      supabase.from('custom_fields').select('*').eq('entity_type', 'employee').eq('active', true).order('sort'),
+      supabase.from('form_layouts').select('slots').eq('entity_type', 'employee').maybeSingle(),
+    ]);
+    if (!cf.error) setCustom((cf.data as CustomField[]) ?? []);
+    setSlots((lay.data?.slots as Slot[]) ?? []);
+  }
+  useEffect(() => { reloadMeta(); }, []);
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const emp = unwrap(await supabase.from('employees')
@@ -125,35 +144,33 @@ export default function EmployeeDetail() {
   if (loading) return <Loading />;
   if (loadErr || !data || !form) return <Msg kind="err">{loadErr || 'העובד לא נמצא.'}</Msg>;
   const { emp, docs, feedback } = data;
-  // superadmin נשמר כאפשרות רק אם זה כבר תפקידו — כדי לא לאפשר הענקה מהמסך.
-  const roleOptions = emp.role === 'superadmin' ? ['superadmin', ...ASSIGNABLE_ROLES] : [...ASSIGNABLE_ROLES];
+  const f = form;
+  const getVal = (fld: RenderField) => fld.kind === 'builtin'
+    ? (f as unknown as Record<string, any>)[fld.column!]
+    : (f.custom ?? {})[fld.cfKey!];
+  const setValF = (fld: RenderField, v: any) => fld.kind === 'builtin'
+    ? setForm({ ...f, [fld.column!]: v })
+    : setForm({ ...f, custom: { ...(f.custom ?? {}), [fld.cfKey!]: v } });
 
   return (
     <>
       <PageHead title={emp.full_name} sub={`${label(ROLE, emp.role)}${emp.job_title ? ' · ' + emp.job_title : ''}`}
-        action={<Link to="/employees" className="btn btn-quiet btn-sm">חזרה לרשימה</Link>} />
+        action={<>
+          {canBuild && <button type="button" className="btn btn-quiet btn-sm" onClick={() => setEditorOpen(true)}>✎ עריכת מבנה הטופס</button>}
+          <Link to="/employees" className="btn btn-quiet btn-sm">חזרה לרשימה</Link>
+        </>} />
       <Msg kind="err">{err}</Msg>
 
       <div className="grid2 emp-grid">
         <form className="card" style={{ padding: 20, display: 'grid', gap: 14 }} onSubmit={saveDetails}>
           <h2 className="sec">פרטי עובד</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14 }}>
-            <label><span className="lbl">שם מלא</span><input value={form.full_name ?? ''} onChange={ev => setForm({ ...form, full_name: ev.target.value })} required /></label>
-            <label><span className="lbl">דוא״ל</span><input type="email" dir="ltr" value={form.email ?? ''} onChange={ev => setForm({ ...form, email: ev.target.value })} required /></label>
-            <label><span className="lbl">טלפון</span><input type="tel" dir="ltr" value={form.phone ?? ''} onChange={ev => setForm({ ...form, phone: ev.target.value })} /></label>
-            <label><span className="lbl">תפקיד/משרה</span><input value={form.job_title ?? ''} onChange={ev => setForm({ ...form, job_title: ev.target.value })} /></label>
-            <label><span className="lbl">תפקיד במערכת</span>
-              <select value={form.role} onChange={ev => setForm({ ...form, role: ev.target.value })}>
-                {roleOptions.map(k => <option key={k} value={k}>{ROLE[k]}</option>)}
-              </select></label>
-            <label><span className="lbl">סטטוס העסקה</span>
-              <select value={form.employment_status} onChange={ev => setForm({ ...form, employment_status: ev.target.value })}>
-                {Object.entries(EMP_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></label>
-            <label><span className="lbl">תחילת עבודה</span><input type="date" value={form.hire_date ?? ''} onChange={ev => setForm({ ...form, hire_date: ev.target.value })} /></label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 14 }}>
+            {fields.filter(fl => !fl.hidden).map(fl => (
+              <div key={fl.ref} style={{ gridColumn: `span ${SPAN[fl.width] ?? 6}` }}>
+                <FieldInput field={fl} value={getVal(fl)} onChange={v => setValF(fl, v)} />
+              </div>
+            ))}
           </div>
-          <label><span className="lbl">הערות</span><textarea value={form.notes ?? ''} onChange={ev => setForm({ ...form, notes: ev.target.value })} rows={2} /></label>
-          <CustomFieldsEdit entityType="employee" values={form.custom} onChange={v => setForm({ ...form, custom: v })} />
           <Msg kind="ok">{saved}</Msg>
           <div><button className="btn btn-primary btn-sm" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button></div>
         </form>
@@ -212,6 +229,15 @@ export default function EmployeeDetail() {
         </>}>
         <p>הפעולה בלתי הפיכה. אם למגייס יש השמות, משימות או רשומות שיצר — המחיקה תיחסם ותוצע הקפאה במקום.</p>
       </Dialog>
+
+      {canBuild && (
+        <Dialog open={editorOpen} title="עריכת מבנה הטופס — עובד" wide
+          description="סדר, הסתרה, רוחב ותווית לשדות המובנים; הוספה/עריכה/מחיקה של שדות מכל סוג."
+          onClose={() => { setEditorOpen(false); reloadMeta(); }}
+          footer={<button type="button" className="btn btn-primary" onClick={() => { setEditorOpen(false); reloadMeta(); }}>סיום</button>}>
+          <FormLayoutEditor entityType="employee" builtins={EMPLOYEE_BUILTINS} />
+        </Dialog>
+      )}
 
       <style>{`
         .emp-grid { grid-template-columns: 1.2fr 1fr; }
