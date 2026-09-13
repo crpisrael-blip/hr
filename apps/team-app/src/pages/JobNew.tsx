@@ -1,77 +1,129 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { SCOPE } from '../lib/format';
+import { useAuth, isSuperadmin } from '../lib/auth';
 import { toUserMessage } from '../lib/errors';
+import { effectiveFields, JOB_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
+import type { CustomField } from '../components/CustomFields';
+import FieldInput from '../components/FieldInput';
+import FormLayoutEditor from '../components/FormLayoutEditor';
 import PageHead from '../components/PageHead';
+import Dialog from '../components/Dialog';
 import { Msg } from '../components/Msg';
-import { CustomFieldsEdit } from '../components/CustomFields';
 
 interface Company { id: string; name: string; }
+const SPAN: Record<string, number> = { full: 6, half: 3, third: 2 };
 
 export default function JobNew() {
   const nav = useNavigate();
   const { id } = useParams();
   const editing = !!id;
+  const { employee } = useAuth();
+  const canBuild = isSuperadmin(employee);
+
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [form, setForm] = useState({
-    company_id: '', title: '', internal_description: '', location: '',
-    employment_scope: 'full_time', headcount: '1', salary_min: '', salary_max: '',
-  });
-  const [custom, setCustom] = useState<Record<string, unknown>>({});
+  const [custom, setCustom] = useState<CustomField[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [values, setValues] = useState<Record<string, any>>({ 'builtin:headcount': '1', 'builtin:employment_scope': 'full_time' });
+  const [loadedCustom, setLoadedCustom] = useState<Record<string, unknown>>({});
+  const [editorOpen, setEditorOpen] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const fields = useMemo(() => effectiveFields(JOB_BUILTINS, custom, slots), [custom, slots]);
+
+  async function reloadMeta() {
+    const [cf, lay] = await Promise.all([
+      supabase.from('custom_fields').select('*').eq('entity_type', 'job').eq('active', true).order('sort'),
+      supabase.from('form_layouts').select('slots').eq('entity_type', 'job').maybeSingle(),
+    ]);
+    if (!cf.error) setCustom((cf.data as CustomField[]) ?? []);
+    setSlots((lay.data?.slots as Slot[]) ?? []);
+  }
+
   useEffect(() => {
     let alive = true;
-    supabase.from('companies').select('id, name').order('name').limit(500)
-      .then(r => {
-        if (!alive) return;
-        if (r.error) { setErr(toUserMessage(r.error, 'טעינת רשימת החברות נכשלה.')); return; }
-        setCompanies(r.data as Company[]);
-      });
+    supabase.from('companies').select('id, name').order('name').limit(500).then(r => {
+      if (!alive) return;
+      if (r.error) { setErr(toUserMessage(r.error, 'טעינת רשימת החברות נכשלה.')); return; }
+      setCompanies(r.data as Company[]);
+    });
+    reloadMeta();
     return () => { alive = false; };
   }, []);
 
   useEffect(() => {
     if (!editing) return;
     let alive = true;
-    supabase.from('jobs').select('company_id, title, internal_description, location, employment_scope, headcount, salary_min, salary_max, custom')
-      .eq('id', id).maybeSingle().then(({ data, error }) => {
-        if (!alive) return;
-        if (error) { setErr(toUserMessage(error, 'טעינת המשרה נכשלה.')); return; }
-        if (!data) { setErr('המשרה לא נמצאה.'); return; }
-        setForm({
-          company_id: data.company_id ?? '', title: data.title ?? '',
-          internal_description: data.internal_description ?? '', location: data.location ?? '',
-          employment_scope: data.employment_scope ?? 'full_time',
-          headcount: data.headcount != null ? String(data.headcount) : '1',
-          salary_min: data.salary_min != null ? String(data.salary_min) : '',
-          salary_max: data.salary_max != null ? String(data.salary_max) : '',
-        });
-        setCustom(data.custom ?? {});
-      });
+    const cols = JOB_BUILTINS.map(b => b.column).join(', ');
+    supabase.from('jobs').select(`${cols}, custom`).eq('id', id).maybeSingle().then(({ data, error }) => {
+      if (!alive) return;
+      if (error) { setErr(toUserMessage(error, 'טעינת המשרה נכשלה.')); return; }
+      if (!data) { setErr('המשרה לא נמצאה.'); return; }
+      const d = data as Record<string, any>;
+      const v: Record<string, any> = {};
+      for (const b of JOB_BUILTINS) {
+        const raw = d[b.column];
+        v['builtin:' + b.column] = raw == null ? '' : (typeof raw === 'number' ? String(raw) : raw);
+      }
+      const cust = (d.custom ?? {}) as Record<string, unknown>;
+      setLoadedCustom(cust);
+      for (const [k, val] of Object.entries(cust)) v['custom:' + k] = val;
+      setValues(prev => ({ ...prev, ...v }));
+    });
     return () => { alive = false; };
   }, [id, editing]);
 
-  function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm(f => ({ ...f, [k]: v })); }
+  const setVal = (ref: string, v: any) => setValues(s => ({ ...s, [ref]: v }));
+
+  function coerceBuiltin(f: RenderField, v: any): unknown {
+    switch (f.column) {
+      case 'company_id': return v || null;
+      case 'title': return (v ?? '').trim();
+      case 'headcount': return v === '' || v == null ? 1 : Number(v);
+      case 'salary_min':
+      case 'salary_max': return v ? Number(v) : null;
+      case 'employment_scope': return v || null;
+      default:
+        if (f.widget === 'number') return v ? Number(v) : null;
+        if (f.widget === 'boolean') return !!v;
+        if (f.widget === 'multiselect') return Array.isArray(v) ? v : [];
+        return (typeof v === 'string' ? v.trim() : v) || null;
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
-    const headcount = form.headcount.trim() === '' ? 1 : Number(form.headcount);
-    if (!Number.isInteger(headcount) || headcount < 1) { setErr('מספר התקנים חייב להיות מספר שלם מ-1 ומעלה.'); setBusy(false); return; }
-    const min = form.salary_min ? Number(form.salary_min) : null;
-    const max = form.salary_max ? Number(form.salary_max) : null;
-    if (min != null && max != null && max < min) { setErr('שכר "עד" חייב להיות גדול או שווה לשכר "מ־".'); setBusy(false); return; }
-    const body: Record<string, unknown> = {
-      company_id: form.company_id, title: form.title.trim(),
-      internal_description: form.internal_description.trim() || null,
-      location: form.location.trim() || null, employment_scope: form.employment_scope,
-      headcount,
-      salary_min: min, salary_max: max,
-      custom,
-    };
+    e.preventDefault(); setErr('');
+    const visible = fields.filter(f => !f.hidden);
+
+    for (const f of visible) {
+      const v = values[f.ref];
+      const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
+      if (f.required && empty) { setErr(`שדה חובה: ${f.label}.`); return; }
+    }
+    const hc = visible.find(f => f.column === 'headcount');
+    if (hc) {
+      const n = values[hc.ref] === '' ? 1 : Number(values[hc.ref]);
+      if (!Number.isInteger(n) || n < 1) { setErr('מספר התקנים חייב להיות מספר שלם מ-1 ומעלה.'); return; }
+    }
+    const smin = visible.find(f => f.column === 'salary_min');
+    const smax = visible.find(f => f.column === 'salary_max');
+    if (smin && smax) {
+      const a = values[smin.ref] ? Number(values[smin.ref]) : null;
+      const b = values[smax.ref] ? Number(values[smax.ref]) : null;
+      if (a != null && b != null && b < a) { setErr('שכר "עד" חייב להיות גדול או שווה לשכר "מ־".'); return; }
+    }
+
+    const body: Record<string, unknown> = {};
+    const customObj: Record<string, unknown> = editing ? { ...loadedCustom } : {};
+    for (const f of visible) {
+      if (f.kind === 'builtin') body[f.column!] = coerceBuiltin(f, values[f.ref]);
+      else customObj[f.cfKey!] = f.widget === 'boolean' ? !!values[f.ref] : (values[f.ref] ?? null);
+    }
+    body.custom = customObj;
     if (!editing) body.stage = 'draft';
+
+    setBusy(true);
     const { error } = editing
       ? await supabase.from('jobs').update(body).eq('id', id)
       : await supabase.from('jobs').insert(body);
@@ -79,44 +131,36 @@ export default function JobNew() {
     if (error) setErr(toUserMessage(error, 'שמירת המשרה נכשלה.')); else nav('/jobs');
   }
 
+  const companyMissing = companies.length === 0;
+
   return (
     <>
-      <PageHead title={editing ? 'עריכת משרה' : 'משרה חדשה'} />
-      {companies.length === 0 && <Msg kind="err" style={{ marginBottom: 16 }}>
+      <PageHead title={editing ? 'עריכת משרה' : 'משרה חדשה'}
+        action={canBuild ? <button type="button" className="btn btn-quiet btn-sm" onClick={() => setEditorOpen(true)}>✎ עריכת מבנה הטופס</button> : undefined} />
+      {companyMissing && <Msg kind="err" style={{ marginBottom: 16 }}>
         צריך קודם להקים חברה. <Link to="/companies/new">להקמת חברה</Link></Msg>}
-      <form className="card" style={{ padding: 24, maxWidth: 620, display: 'grid', gap: 16 }} onSubmit={onSubmit}>
-        <label><span className="lbl">חברה *</span>
-          <select value={form.company_id} onChange={e => set('company_id', e.target.value)} required>
-            <option value="">בחרו חברה…</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select></label>
-        <label><span className="lbl">תפקיד *</span>
-          <input value={form.title} onChange={e => set('title', e.target.value)} required /></label>
-        <label><span className="lbl">תיאור פנימי</span>
-          <textarea value={form.internal_description} onChange={e => set('internal_description', e.target.value)} /></label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <label><span className="lbl">מיקום</span>
-            <input value={form.location} onChange={e => set('location', e.target.value)} /></label>
-          <label><span className="lbl">היקף</span>
-            <select value={form.employment_scope} onChange={e => set('employment_scope', e.target.value)}>
-              {Object.entries(SCOPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select></label>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-          <label><span className="lbl">תקנים</span>
-            <input type="number" min={1} step={1} value={form.headcount} onChange={e => set('headcount', e.target.value)} /></label>
-          <label><span className="lbl">שכר מ־</span>
-            <input type="number" min={0} value={form.salary_min} onChange={e => set('salary_min', e.target.value)} /></label>
-          <label><span className="lbl">שכר עד</span>
-            <input type="number" min={0} value={form.salary_max} onChange={e => set('salary_max', e.target.value)} /></label>
-        </div>
-        <CustomFieldsEdit entityType="job" values={custom} onChange={setCustom} />
-        <Msg kind="err">{err}</Msg>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-primary" disabled={busy || !form.company_id}>{busy ? 'שומר…' : 'שמירה'}</button>
+
+      <form className="card" style={{ padding: 24, maxWidth: 680, display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 16 }} onSubmit={onSubmit}>
+        {fields.filter(f => !f.hidden).map(f => (
+          <div key={f.ref} style={{ gridColumn: `span ${SPAN[f.width] ?? 6}` }}>
+            <FieldInput field={f} value={values[f.ref]} onChange={v => setVal(f.ref, v)} companies={companies} />
+          </div>
+        ))}
+        <div style={{ gridColumn: '1 / -1' }}><Msg kind="err">{err}</Msg></div>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10 }}>
+          <button className="btn btn-primary" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button>
           <button type="button" className="btn btn-quiet" onClick={() => nav('/jobs')}>ביטול</button>
         </div>
       </form>
+
+      {canBuild && (
+        <Dialog open={editorOpen} title="עריכת מבנה הטופס — משרה" wide
+          description="סדר, הסתרה, רוחב ותווית לשדות המובנים; הוספה/עריכה/מחיקה של שדות מכל סוג. השינוי חל על כל טופסי המשרה."
+          onClose={() => { setEditorOpen(false); reloadMeta(); }}
+          footer={<button type="button" className="btn btn-primary" onClick={() => { setEditorOpen(false); reloadMeta(); }}>סיום</button>}>
+          <FormLayoutEditor entityType="job" builtins={JOB_BUILTINS} />
+        </Dialog>
+      )}
     </>
   );
 }
