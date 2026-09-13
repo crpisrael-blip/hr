@@ -36,7 +36,7 @@ export const ENTITIES: EntityType[] = [
   // ★ אבטחה: employees אינה mappable בכוונה. מיפוי שדות מאפשר לכל עורך טופס
   // לקבוע טבלה+עמודה שתשובה מהטופס תדרוס — ורשומת עובד נושאת role/employment_status/user_id.
   // מיפוי לעובדים ייפתח רק כשתהיה אכיפה בצד השרת על העמודות המותרות.
-  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, linkable: true },
+  { key: 'employee',    label: 'עובד / מגייס', table: 'employees',   nameCol: 'full_name', recipient: 'staff',     filing: true, linkable: true, customFields: true },
   { key: 'company',     label: 'לקוח',         table: 'companies',   nameCol: 'name',      recipient: 'client',    filing: true, mappable: true, linkable: true, customFields: true,
     columns: [
       { col: 'name',        label: 'שם החברה' },
@@ -45,7 +45,7 @@ export const ENTITIES: EntityType[] = [
       { col: 'notes',       label: 'הערות' },
     ] },
   { key: 'application', label: 'מועמדות',      table: 'applications', nameCol: null,        filing: true, customFields: true },
-  { key: 'placement',   label: 'השמה',         table: 'placements',  nameCol: null,        filing: true },
+  { key: 'placement',   label: 'השמה',         table: 'placements',  nameCol: null,        filing: true, customFields: true },
 ];
 
 // "מיועד ל" — כללי + כל סוג שיכול לקבל טופס. נגזר מהרجיסטרי.

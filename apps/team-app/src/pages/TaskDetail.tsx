@@ -7,11 +7,13 @@ import { useLoad, unwrap } from '../lib/useLoad';
 import { rpcErrorMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
 import Dialog from '../components/Dialog';
+import { CustomFieldsCard } from '../components/CustomFields';
 import { Msg, Loading } from '../components/Msg';
 
 interface Task {
   id: string; title: string; description: string | null; priority: string; status: string;
   due_at: string | null; completion_rule: string; source: string; cancel_reason: string | null;
+  custom: Record<string, unknown> | null;
 }
 interface Assignee {
   employee_id: string; personal_status: string; done_at: string | null;
@@ -99,6 +101,11 @@ export default function TaskDetail() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <CustomFieldsCard entityType="task" initial={t.custom}
+          onSave={async v => ({ error: (await supabase.from('tasks').update({ custom: v }).eq('id', id)).error })} />
       </div>
 
       <Dialog open={cancelOpen} title="ביטול משימה" onClose={() => setCancelOpen(false)} onSubmit={cancelTask}

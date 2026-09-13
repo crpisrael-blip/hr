@@ -4,6 +4,7 @@ import { supabase, fin, enrichPlacements, employeeNames } from '../lib/supabase'
 import { useAuth } from '../lib/auth';
 import { PLACEMENT_STATUS, INVOICE_STATUS, COMMISSION_BASE, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
+import { CustomFieldsCard } from '../components/CustomFields';
 
 export default function PlacementDetail() {
   const { id } = useParams();
@@ -96,6 +97,11 @@ export default function PlacementDetail() {
             </table>
           )}
         </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <CustomFieldsCard entityType="placement" initial={p.custom}
+          onSave={async v => ({ error: (await fin.rpc('set_placement_custom', { p_id: id, p_custom: v })).error })} />
       </div>
       <style>{`
         .grid2 { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; align-items: start; }
