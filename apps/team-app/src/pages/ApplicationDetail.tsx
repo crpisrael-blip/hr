@@ -19,7 +19,15 @@ interface Application {
 }
 interface HistRow { id: number; from_stage: string | null; to_stage: string; reason: string | null; changed_at: string }
 interface Interview { id: string; scheduled_at: string; location: string | null; status: string }
-interface Submission { id: string; sent_at: string; sent_manually: boolean; contacts: { full_name: string } | null }
+interface Submission { id: string; sent_at: string; sent_manually: boolean; contact_id: string | null; summary_sent: string | null; contacts: { full_name: string } | null }
+
+const IV_STATUS: Record<string, string> = { scheduled: 'מתוזמן', completed: 'התקיים', cancelled: 'בוטל', no_show: 'לא הופיע' };
+
+/** ISO → ערך של datetime-local בשעון המקומי (בלי אזור זמן). */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso); const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 interface ContactOpt { id: string; full_name: string }
 interface EmployeeOpt { id: string; full_name: string }
 
@@ -52,7 +60,7 @@ export default function ApplicationDetail() {
     const [h, iv, sb, ct] = await Promise.all([
       supabase.from('application_stage_history').select('id, from_stage, to_stage, reason, changed_at').eq('application_id', id).order('changed_at', { ascending: false }),
       supabase.from('interviews').select('id, scheduled_at, location, status').eq('application_id', id).order('scheduled_at', { ascending: false }),
-      supabase.from('client_submissions').select('id, sent_at, sent_manually, contacts(full_name)').eq('application_id', id).order('sent_at', { ascending: false }),
+      supabase.from('client_submissions').select('id, sent_at, sent_manually, contact_id, summary_sent, contacts(full_name)').eq('application_id', id).order('sent_at', { ascending: false }),
       // בלי company_id אין למי לשלוח — לא שולחים eq('company_id', undefined).
       companyId
         ? supabase.from('contacts').select('id, full_name').eq('company_id', companyId)
@@ -166,8 +174,9 @@ export default function ApplicationDetail() {
       <style>{`
         .app-grid { grid-template-columns: 1.3fr 1fr; }
         .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-        .subrow { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+        .subrow { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: center; }
         .subrow:last-child { border-bottom: 0; }
+        .row-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
         .addbtn { margin-top: 12px; }
         @media (max-width: 820px) { .app-grid { grid-template-columns: 1fr; } }
       `}</style>
@@ -178,44 +187,79 @@ export default function ApplicationDetail() {
 function Interviews({ appId, meId, rows, onChange }:
   { appId: string; meId: string | null; rows: Interview[]; onChange: () => void }) {
   const [open, setOpen] = useState(false);
-  const [when, setWhen] = useState(''); const [loc, setLoc] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [when, setWhen] = useState(''); const [loc, setLoc] = useState(''); const [status, setStatus] = useState('scheduled');
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const [del, setDel] = useState<Interview | null>(null); const [delBusy, setDelBusy] = useState(false);
 
-  async function add(e: FormEvent) {
+  function startAdd() { setEditId(null); setWhen(''); setLoc(''); setStatus('scheduled'); setErr(''); setOpen(true); }
+  function startEdit(iv: Interview) { setEditId(iv.id); setWhen(toLocalInput(iv.scheduled_at)); setLoc(iv.location ?? ''); setStatus(iv.status || 'scheduled'); setErr(''); setOpen(true); }
+
+  async function save(e: FormEvent) {
     e.preventDefault(); setErr('');
     const at = new Date(when);
     if (Number.isNaN(at.getTime())) { setErr('מועד הראיון אינו תקין.'); return; }
     setBusy(true);
-    const { error } = await supabase.from('interviews').insert({
-      application_id: appId, scheduled_at: at.toISOString(), location: loc.trim() || null, created_by: meId,
-    });
+    const patch = { scheduled_at: at.toISOString(), location: loc.trim() || null, status };
+    const { error } = editId
+      ? await supabase.from('interviews').update(patch).eq('id', editId)
+      : await supabase.from('interviews').insert({ application_id: appId, created_by: meId, ...patch });
     setBusy(false);
     if (error) { setErr(toUserMessage(error, 'שמירת הראיון נכשלה.')); return; }
-    setOpen(false); setWhen(''); setLoc(''); onChange();
+    setOpen(false); setEditId(null); onChange();
+  }
+
+  async function remove() {
+    if (!del) return;
+    setDelBusy(true); setErr('');
+    const { error } = await supabase.from('interviews').delete().eq('id', del.id);
+    setDelBusy(false); setDel(null);
+    if (error) { setErr(toUserMessage(error, 'מחיקת הראיון נכשלה.')); return; }
+    onChange();
   }
 
   return (
     <div className="card" style={{ padding: 20 }}>
       <h2 className="sec">ראיונות</h2>
+      <Msg kind="err">{err}</Msg>
       {rows.length === 0 ? <p className="hint">אין ראיונות מתוזמנים.</p> : rows.map(iv => (
         <div key={iv.id} className="subrow">
           <span>🗓 {formatDateTime(iv.scheduled_at)}{iv.location ? ' · ' + iv.location : ''}</span>
-          <span className="tag mute">{iv.status === 'scheduled' ? 'מתוזמן' : iv.status}</span>
+          <span className="row-actions">
+            <span className="tag mute">{label(IV_STATUS, iv.status)}</span>
+            <button type="button" className="iconbtn" onClick={() => startEdit(iv)} aria-label="עריכת ראיון">✎</button>
+            <button type="button" className="iconbtn" onClick={() => setDel(iv)} aria-label="מחיקת ראיון">🗑</button>
+          </span>
         </div>
       ))}
       {open ? (
-        <form onSubmit={add} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+        <form onSubmit={save} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           <label><span className="lbl">מועד הראיון *</span>
             <input type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} required /></label>
           <label><span className="lbl">מיקום / קישור</span>
             <input value={loc} onChange={e => setLoc(e.target.value)} /></label>
+          {editId && (
+            <label><span className="lbl">סטטוס</span>
+              <select value={status} onChange={e => setStatus(e.target.value)}>
+                {Object.entries(IV_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select></label>
+          )}
           <Msg kind="err">{err}</Msg>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" disabled={busy || !when}>שמירה</button>
-            <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>ביטול</button>
+            <button className="btn btn-primary btn-sm" disabled={busy || !when}>{editId ? 'עדכון ראיון' : 'שמירה'}</button>
+            <button type="button" className="btn btn-quiet btn-sm" onClick={() => { setOpen(false); setEditId(null); }}>ביטול</button>
           </div>
         </form>
-      ) : <button className="btn btn-quiet btn-sm addbtn" onClick={() => setOpen(true)}>+ זימון ראיון</button>}
+      ) : <button className="btn btn-quiet btn-sm addbtn" onClick={startAdd}>+ זימון ראיון</button>}
+
+      <Dialog open={!!del} title="מחיקת ראיון" onClose={() => setDel(null)}
+        description={del ? formatDateTime(del.scheduled_at) : undefined}
+        footer={<>
+          <button className="btn btn-danger" disabled={delBusy} onClick={remove}>{delBusy ? 'מוחק…' : 'מחיקה'}</button>
+          <button className="btn btn-quiet" onClick={() => setDel(null)}>ביטול</button>
+        </>}>
+        <p>הראיון יימחק לצמיתות.</p>
+      </Dialog>
     </div>
   );
 }
@@ -223,31 +267,52 @@ function Interviews({ appId, meId, rows, onChange }:
 function Submissions({ appId, meId, rows, contacts, onChange }:
   { appId: string; meId: string | null; rows: Submission[]; contacts: ContactOpt[]; onChange: () => void }) {
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [contactId, setContactId] = useState(''); const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const [del, setDel] = useState<Submission | null>(null); const [delBusy, setDelBusy] = useState(false);
 
-  async function add(e: FormEvent) {
+  function startAdd() { setEditId(null); setContactId(''); setSummary(''); setErr(''); setOpen(true); }
+  function startEdit(s: Submission) { setEditId(s.id); setContactId(s.contact_id ?? ''); setSummary(s.summary_sent ?? ''); setErr(''); setOpen(true); }
+
+  async function save(e: FormEvent) {
     e.preventDefault(); setBusy(true); setErr('');
-    const { error } = await supabase.from('client_submissions').insert({
-      application_id: appId, contact_id: contactId || null, summary_sent: summary.trim() || null,
-      channel: 'email', sent_manually: true, sent_at: new Date().toISOString(), created_by: meId,
-    });
+    const { error } = editId
+      ? await supabase.from('client_submissions').update({ contact_id: contactId || null, summary_sent: summary.trim() || null }).eq('id', editId)
+      : await supabase.from('client_submissions').insert({
+          application_id: appId, contact_id: contactId || null, summary_sent: summary.trim() || null,
+          channel: 'email', sent_manually: true, sent_at: new Date().toISOString(), created_by: meId,
+        });
     setBusy(false);
     if (error) { setErr(toUserMessage(error, 'שמירת ההגשה נכשלה.')); return; }
-    setOpen(false); setSummary(''); onChange();
+    setOpen(false); setEditId(null); onChange();
+  }
+
+  async function remove() {
+    if (!del) return;
+    setDelBusy(true); setErr('');
+    const { error } = await supabase.from('client_submissions').delete().eq('id', del.id);
+    setDelBusy(false); setDel(null);
+    if (error) { setErr(toUserMessage(error, 'מחיקת ההגשה נכשלה.')); return; }
+    onChange();
   }
 
   return (
     <div className="card" style={{ padding: 20 }}>
       <h2 className="sec">הגשות ללקוח</h2>
+      <Msg kind="err">{err}</Msg>
       {rows.length === 0 ? <p className="hint">אין הגשות. הגשה שומרת נמען ומועד.</p> : rows.map(s => (
         <div key={s.id} className="subrow">
           <span>📤 {s.contacts?.full_name ?? 'נמען'} {s.sent_manually && <span className="tag mute">נשלח ידנית</span>}</span>
-          <span className="hint">{formatDate(s.sent_at)}</span>
+          <span className="row-actions">
+            <span className="hint">{formatDate(s.sent_at)}</span>
+            <button type="button" className="iconbtn" onClick={() => startEdit(s)} aria-label="עריכת הגשה">✎</button>
+            <button type="button" className="iconbtn" onClick={() => setDel(s)} aria-label="מחיקת הגשה">🗑</button>
+          </span>
         </div>
       ))}
       {open ? (
-        <form onSubmit={add} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+        <form onSubmit={save} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           <label><span className="lbl">איש קשר אצל הלקוח</span>
             <select value={contactId} onChange={e => setContactId(e.target.value)}>
               <option value="">— ללא —</option>
@@ -257,11 +322,20 @@ function Submissions({ appId, meId, rows, contacts, onChange }:
             <textarea value={summary} onChange={e => setSummary(e.target.value)} /></label>
           <Msg kind="err">{err}</Msg>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" disabled={busy}>שמירת הגשה</button>
-            <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>ביטול</button>
+            <button className="btn btn-primary btn-sm" disabled={busy}>{editId ? 'עדכון הגשה' : 'שמירת הגשה'}</button>
+            <button type="button" className="btn btn-quiet btn-sm" onClick={() => { setOpen(false); setEditId(null); }}>ביטול</button>
           </div>
         </form>
-      ) : <button className="btn btn-quiet btn-sm addbtn" onClick={() => setOpen(true)}>+ תיעוד הגשה ללקוח</button>}
+      ) : <button className="btn btn-quiet btn-sm addbtn" onClick={startAdd}>+ תיעוד הגשה ללקוח</button>}
+
+      <Dialog open={!!del} title="מחיקת הגשה" onClose={() => setDel(null)}
+        description={del?.contacts?.full_name ?? undefined}
+        footer={<>
+          <button className="btn btn-danger" disabled={delBusy} onClick={remove}>{delBusy ? 'מוחק…' : 'מחיקה'}</button>
+          <button className="btn btn-quiet" onClick={() => setDel(null)}>ביטול</button>
+        </>}>
+        <p>ההגשה תימחק לצמיתות.</p>
+      </Dialog>
     </div>
   );
 }

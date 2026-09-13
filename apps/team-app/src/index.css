@@ -50,6 +50,8 @@ button { font: inherit; }
 .btn-danger-quiet:hover { filter: brightness(.97); }
 .btn-sm { min-height: 36px; padding: 6px 12px; font-size: .87rem; border-radius: 8px; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
+.iconbtn { border: 0; background: transparent; cursor: pointer; padding: 4px 6px; border-radius: 6px; font-size: .95rem; line-height: 1; color: var(--ink-mid); }
+.iconbtn:hover { background: var(--sunk); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 
 label { display: block; }
