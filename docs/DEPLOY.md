@@ -21,23 +21,26 @@
 
 ## 0. טבלת הבנייה — מה להגדיר בכל פרויקט Cloudflare
 
-כל פרויקט Cloudflare מצביע על **תיקיית האפליקציה שלו** כ-Root directory. שם
-יושב ה-`wrangler.toml` הצמוד, ולכן `npx wrangler deploy` מוצא אותו בלי `--config`,
-ו-`npm run build` מריץ את סקריפט הבנייה של אותה אפליקציה. ההתקנה (`npm ci`) רצה
-אוטומטית מהשורש ומתקינה את כל ה-workspace, כך שהתלויות זמינות גם מתיקיית האפליקציה.
+ה-Root directory של כל שלושת הפרויקטים הוא **שורש הריפו (`/`)** — חובה, כי זה
+monorepo עם npm workspaces (התלויות מותקנות פעם אחת בשורש; `npm ci` מתיקיית
+אפליקציה נכשל). מהשורש, פקודות ה-`build:<app>`/`deploy:<app>` בונות ופורסות כל
+פרויקט לאפליקציה הנכונה שלו.
 
 | Cloudflare project | Root directory | Build command | Deploy command | משתני Build נדרשים |
 |---|---|---|---|---|
-| `hr-public-site` | `apps/public-site` | `npm run build` | `npx wrangler deploy` | `NODE_VERSION=22`, `DATABASE_URL`, `PUBLIC_APPLY_ENDPOINT`, (רשות) `PUBLIC_SITE_URL` |
-| `hr-team-app` | `apps/team-app` | `npm run build` | `npx wrangler deploy` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| `hr-candidate-app` | `apps/candidate-app` | `npm run build` | `npx wrangler deploy` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| `hr-public-site` | `/` | `npm run build:public` | `npm run deploy:public` | `NODE_VERSION=22`, `DATABASE_URL`, `PUBLIC_APPLY_ENDPOINT`, (רשות) `PUBLIC_SITE_URL` |
+| `hr-team-app` | `/` | `npm run build:team` | `npm run deploy:team` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| `hr-candidate-app` | `/` | `npm run build:candidate` | `npm run deploy:candidate` | `NODE_VERSION=22`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
-> ⚠️ **אין `wrangler.toml` בשורש הריפו** (הוסר בכוונה — הוא הצביע על team-app
-> בלבד וקשר את שלושת הפרויקטים לאותה אפליקציה). לכן ה-Root directory של כל פרויקט
-> חייב להיות תיקיית האפליקציה — שם יושב ה-`wrangler.toml` הנכון. אם Root directory
-> מוגדר כ-`/`, הפקודה `npx wrangler deploy` תיכשל עם *"create a wrangler.jsonc …
-> Failed"*, וסקריפטים כמו `build:public`/`deploy:public` (שקיימים רק ב-package.json
-> של השורש) ייכשלו עם *"Missing script"* כשהם רצים מתיקיית האפליקציה.
+> ⚠️ **חובה להגדיר בכל פרויקט גם את ה-Build command וגם את ה-Deploy command
+> לפי הטבלה — אחד לכל אפליקציה.** אין `wrangler.toml` בשורש הריפו (הוסר בכוונה —
+> הצביע על team-app בלבד). לכן:
+> - **Build:** הפקודה הכללית `npm run build` שווה ל-`build:team` בלבד, כך שכל
+>   פרויקט שמשתמש בה יבנה את team-app. חייבים `build:public`/`build:team`/`build:candidate`.
+> - **Deploy:** ברירת המחדל (`npx wrangler deploy` או `npx wrangler versions upload`)
+>   רצה מהשורש, לא מוצאת קונפיגורציה ונכשלת עם *"Missing entry-point … / create a
+>   wrangler.jsonc"*. פקודות `deploy:*` מוסיפות `--config apps/<app>/wrangler.toml`
+>   ומפנות כל פרויקט לאפליקציה הנכונה.
 
 פריסה ידנית מהמכונה — פועלת מהשורש עם `--config` המפורש שבסקריפטי npm:
 
