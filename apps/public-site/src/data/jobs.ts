@@ -51,6 +51,16 @@ export function loadJobs(): Promise<Job[]> {
   return cache;
 }
 
+/** תצורת ה-SSL לחיבור המסד בבנייה. ברירת מחדל מאובטחת (verify-full). */
+function dbSsl(): 'verify-full' | 'require' | { ca: string; rejectUnauthorized: true } | { rejectUnauthorized: false } {
+  const ca = process.env.DATABASE_CA_CERT?.trim();
+  if (ca) return { ca, rejectUnauthorized: true };
+  const mode = process.env.DATABASE_SSL_MODE?.trim();
+  if (mode === 'require') return 'require';
+  if (mode === 'no-verify') return { rejectUnauthorized: false };
+  return 'verify-full';
+}
+
 async function fetchJobs(): Promise<Job[]> {
   let url = process.env.DATABASE_URL?.trim();
 
@@ -81,10 +91,15 @@ async function fetchJobs(): Promise<Job[]> {
   }
 
   const { default: postgres } = await import('postgres');
-  // verify-full ולא require: ב-postgres.js הערך 'require' שקול ל-
-  // rejectUnauthorized:false, כלומר החיבור שנושא את סיסמת המסד אינו מאמת
-  // את תעודת השרת כלל (B11). prepare:false נדרש ל-pooler של Supabase.
-  const sql = postgres(url, { max: 1, idle_timeout: 5, prepare: false, ssl: 'verify-full' });
+  // אבטחת ה-TLS לחיבור שנושא את סיסמת המסד (B11). ברירת המחדל היא אימות מלא
+  // (verify-full). ה-pooler של Supabase מציג תעודה עם CA עצמי שאינו במאגר של
+  // Node, ולכן verify-full נכשל שם ב-"self-signed certificate in certificate
+  // chain". שתי דרכים נכונות לפתור, לפי סדר עדיפות:
+  //   DATABASE_CA_CERT  — תוכן ה-CA של Supabase (Dashboard → Database → SSL).
+  //                       אימות מלא מול ה-CA הנכון — המאובטח ביותר.
+  //   DATABASE_SSL_MODE=require — מוצפן אך ללא אימות תעודה. אישור מפורש בלבד,
+  //                       לבנייה קוראת-בלבד; פחות מאובטח מ-CA.
+  const sql = postgres(url, { max: 1, idle_timeout: 5, prepare: false, ssl: dbSsl() });
   try {
     const rows = await sql<Job[]>`
       select slug, title, body, location, employment_scope, company_name, published_at

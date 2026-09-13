@@ -165,6 +165,13 @@ curl -si -X OPTIONS https://jsxkwosjtjdypwedzxwx.supabase.co/functions/v1/apply 
 ### hr-public-site (בנייה בלבד, אין סודות בדפדפן)
 - `DATABASE_URL` — מחרוזת ה-Pooler הנקייה (ללא מרכאות/סוגריים). אם לא מוגדר,
   האתר נבנה עם משרות דמה.
+- **SSL של חיבור הבנייה** — ברירת המחדל היא `verify-full` (אימות מלא). ה-pooler
+  של Supabase מציג תעודה עם CA עצמי, ולכן הבנייה תיכשל ב-*"self-signed
+  certificate in certificate chain"* אם לא מגדירים אחד מהשניים:
+  - `DATABASE_CA_CERT` — תוכן ה-CA של Supabase (Dashboard → Database → SSL
+    Configuration → download certificate). אימות מלא מול ה-CA הנכון — **המומלץ**.
+  - `DATABASE_SSL_MODE=require` — מוצפן ללא אימות תעודה. פתרון מהיר לבנייה
+    קוראת-בלבד, פחות מאובטח; להגדיר רק בהיעדר `DATABASE_CA_CERT`.
 - `PUBLIC_APPLY_ENDPOINT` — ראו סעיף 2.
 - `PUBLIC_SITE_URL` — כתובת הבסיס לבניית ה-sitemap והקישורים הקנוניים.
   נקרא ב-`astro.config.mjs`. ברירת מחדל בקוד: `https://hr.ort-tech.co.il`.
