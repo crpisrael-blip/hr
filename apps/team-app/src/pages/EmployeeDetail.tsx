@@ -8,6 +8,7 @@ import { useLoad, unwrap } from '../lib/useLoad';
 import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
 import Dialog from '../components/Dialog';
+import { CustomFieldsEdit } from '../components/CustomFields';
 import { Msg, Loading } from '../components/Msg';
 
 const BUCKET = 'employee-docs';
@@ -16,6 +17,7 @@ interface EmployeeRow {
   id: string; full_name: string; email: string; phone: string | null; role: string;
   job_title: string | null; hire_date: string | null; employment_status: string;
   notes: string | null; user_id: string | null; invited_at: string | null;
+  custom: Record<string, unknown> | null;
 }
 interface DocRow { id: string; kind: string; file_name: string; storage_path: string; size_bytes: number | null; created_at: string }
 interface FeedbackRow { id: string; rating: number | null; body: string; created_at: string }
@@ -43,7 +45,7 @@ export default function EmployeeDetail() {
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const emp = unwrap(await supabase.from('employees')
-      .select('id, full_name, email, phone, role, job_title, hire_date, employment_status, notes, user_id, invited_at')
+      .select('id, full_name, email, phone, role, job_title, hire_date, employment_status, notes, user_id, invited_at, custom')
       .eq('id', id).maybeSingle()) as EmployeeRow | null;
     if (!emp) throw { code: 'PGRST116', message: 'employee not found' };
     const [d, g] = await Promise.all([
@@ -62,6 +64,7 @@ export default function EmployeeDetail() {
       full_name: form.full_name, email: form.email.trim().toLowerCase(), phone: form.phone || null, role: form.role,
       job_title: form.job_title || null, hire_date: form.hire_date || null,
       employment_status: form.employment_status, notes: form.notes || null,
+      custom: form.custom ?? {},
     }).eq('id', id);
     setBusy(false);
     if (error) { setErr(toUserMessage(error, 'שמירת פרטי העובד נכשלה.')); return; }
@@ -150,6 +153,7 @@ export default function EmployeeDetail() {
             <label><span className="lbl">תחילת עבודה</span><input type="date" value={form.hire_date ?? ''} onChange={ev => setForm({ ...form, hire_date: ev.target.value })} /></label>
           </div>
           <label><span className="lbl">הערות</span><textarea value={form.notes ?? ''} onChange={ev => setForm({ ...form, notes: ev.target.value })} rows={2} /></label>
+          <CustomFieldsEdit entityType="employee" values={form.custom} onChange={v => setForm({ ...form, custom: v })} />
           <Msg kind="ok">{saved}</Msg>
           <div><button className="btn btn-primary btn-sm" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button></div>
         </form>

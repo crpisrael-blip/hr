@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth, isSuperadmin } from '../lib/auth';
+import { toUserMessage } from '../lib/errors';
 import Dialog from './Dialog';
+import { Msg } from './Msg';
 import CustomFieldsAdmin from './CustomFieldsAdmin';
 
 // שדות מותאמים ללא קוד. ההגדרות נטענות מ-app.custom_fields לפי סוג הישות,
@@ -67,6 +69,39 @@ export function CustomFieldsEdit({ entityType, values, onChange, title = 'שדו
           <CustomFieldsAdmin entity={entityType} />
         </Dialog>
       )}
+    </div>
+  );
+}
+
+/**
+ * קטע שדות מותאמים עם שמירה עצמאית — לטפסים/כרטיסים שאין להם submit משלהם
+ * שכולל את custom (משימה, השמה). onSave מקבל את הערכים ומחזיר {error}.
+ */
+export function CustomFieldsCard({ entityType, initial, onSave, title = 'שדות נוספים' }:
+  { entityType: string; initial: Vals | null | undefined; onSave: (v: Vals) => Promise<{ error: unknown }>; title?: string }) {
+  const fields = useCustomFields(entityType);
+  const { employee } = useAuth();
+  const canEdit = isSuperadmin(employee);
+  const [vals, setVals] = useState<Vals>(initial ?? {});
+  const [busy, setBusy] = useState(false); const [note, setNote] = useState(''); const [err, setErr] = useState('');
+  if (!fields.length && !canEdit) return null;
+
+  async function save() {
+    setBusy(true); setNote(''); setErr('');
+    const { error } = await onSave(vals);
+    setBusy(false);
+    if (error) { setErr(toUserMessage(error, 'שמירת השדות הנוספים נכשלה.')); return; }
+    setNote('נשמר');
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <CustomFieldsEdit entityType={entityType} values={vals} onChange={v => { setVals(v); setNote(''); }} title={title} />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={save}>{busy ? 'שומר…' : 'שמירת שדות נוספים'}</button>
+        <Msg kind="ok">{note}</Msg>
+        <Msg kind="err">{err}</Msg>
+      </div>
     </div>
   );
 }
