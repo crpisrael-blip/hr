@@ -121,6 +121,30 @@ PUBLIC_APPLY_ENDPOINT=https://jsxkwosjtjdypwedzxwx.supabase.co/functions/v1/appl
 
 ---
 
+## 2.5 בנייה אוטומטית של האתר בעת פרסום משרה (Deploy Hook)
+
+האתר הציבורי סטטי — פרסום/הסרת פרסום/סגירת משרה לא מופיעים בו עד **בנייה מחדש**.
+מיגרציה `0026` יוצרת טריגר במסד (`app.notify_site_rebuild` דרך `pg_net`) שקורא
+ל-**Cloudflare Deploy Hook** בכל שינוי ב-`job_publications` או ב-`jobs.stage` —
+כך האתר מתעדכן לבד, בלי לחיצת "New deployment" ידנית. הגדרה חד-פעמית:
+
+1. **Cloudflare** → `hr-public-site` → Settings → **Deploy Hooks** → **Add** →
+   שם כלשהו + ענף הייצור (`claude/recruitment-placement-spec-fecjmx`). מעתיקים את
+   כתובת ה-hook (URL סודי).
+2. **Supabase SQL Editor** — שומרים את הכתובת בטבלה הנעולה (פעם אחת):
+   ```sql
+   insert into app.site_config (key, value)
+   values ('deploy_hook_url', 'https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/XXXX')
+   on conflict (key) do update set value = excluded.value, updated_at = now();
+   ```
+3. לוודא ש-`pg_net` מותקן (Database → Extensions → `pg_net`, בדרך כלל מופעל).
+
+בדיקה: הסרת פרסום ממשרה במסך "משרות" → בתוך דקה אמורה להופיע בנייה חדשה
+ב-`hr-public-site` → Deployments, והמשרה תיעלם מהאתר. אם ריק ב-`site_config` —
+הטריגר הוא no-op ומתנהגים כמו קודם (בנייה ידנית).
+
+---
+
 ## 3. סודות פונקציות הקצה
 
 מוגדרים ב-**Supabase Dashboard → Edge Functions → Secrets**. אינם יושבים
