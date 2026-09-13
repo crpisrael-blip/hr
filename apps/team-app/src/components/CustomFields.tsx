@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth, isSuperadmin } from '../lib/auth';
+import Dialog from './Dialog';
+import CustomFieldsAdmin from './CustomFieldsAdmin';
 
 // שדות מותאמים ללא קוד. ההגדרות נטענות מ-app.custom_fields לפי סוג הישות,
 // והערכים יושבים באובייקט custom של הישות. רכיב אחד לעריכה ורכיב לתצוגה.
+// מנהל-על יכול לערוך את שדות הטופס במקום, דרך כפתור "עריכת שדות".
 
 export interface CustomField {
   id: string; entity_type: string; key: string; label: string; type: string;
@@ -14,15 +18,16 @@ export const CF_TYPES: [string, string][] = [
   ['boolean', 'כן/לא'], ['select', 'בחירה יחידה'], ['multiselect', 'בחירה מרובה'],
 ];
 
-// טעינת הגדרות השדות הפעילים לסוג ישות.
-export function useCustomFields(entityType: string) {
+// טעינת הגדרות השדות הפעילים לסוג ישות. reloadKey מאפשר רענון יזום אחרי
+// שמנהל-על עורך את השדות במקום.
+export function useCustomFields(entityType: string, reloadKey = 0) {
   const [fields, setFields] = useState<CustomField[]>([]);
   useEffect(() => {
     let alive = true;
     supabase.from('custom_fields').select('*').eq('entity_type', entityType).eq('active', true)
       .order('sort').then(r => { if (alive && !r.error) setFields(r.data as CustomField[]); });
     return () => { alive = false; };
-  }, [entityType]);
+  }, [entityType, reloadKey]);
   return fields;
 }
 
@@ -31,17 +36,37 @@ type Vals = Record<string, any>;
 // עריכה — נטמע בטופסי יצירה/עריכה. onChange מחזיר את אובייקט הערכים המלא.
 export function CustomFieldsEdit({ entityType, values, onChange, title = 'שדות נוספים' }:
   { entityType: string; values: Vals | null | undefined; onChange: (v: Vals) => void; title?: string }) {
-  const fields = useCustomFields(entityType);
-  if (!fields.length) return null;
+  const { employee } = useAuth();
+  const canEdit = isSuperadmin(employee);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const fields = useCustomFields(entityType, reloadKey);
+  // בלי שדות ובלי הרשאת עריכה — אין מה להציג. מנהל-על רואה תמיד את הכפתור.
+  if (!fields.length && !canEdit) return null;
   const vals = values ?? {};
   const set = (k: string, v: any) => onChange({ ...vals, [k]: v });
+  const closeEditor = () => { setEditing(false); setReloadKey(k => k + 1); };
 
   return (
     <div className="card" style={{ padding: 18, display: 'grid', gap: 12 }}>
-      <h2 className="sec" style={{ margin: 0, fontSize: '1.02rem' }}>{title}</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
-        {fields.map(f => <CFEditOne key={f.id} f={f} value={vals[f.key]} onChange={v => set(f.key, v)} />)}
+      <div className="spread" style={{ alignItems: 'center' }}>
+        <h2 className="sec" style={{ margin: 0, fontSize: '1.02rem' }}>{title}</h2>
+        {canEdit && <button type="button" className="btn btn-quiet btn-sm" onClick={() => setEditing(true)}>✎ עריכת שדות</button>}
       </div>
+      {fields.length === 0 ? (
+        <p className="hint">אין עדיין שדות מותאמים. לחצו "עריכת שדות" כדי להוסיף שדות מכל סוג.</p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+          {fields.map(f => <CFEditOne key={f.id} f={f} value={vals[f.key]} onChange={v => set(f.key, v)} />)}
+        </div>
+      )}
+      {canEdit && (
+        <Dialog open={editing} title="עריכת שדות הטופס" wide onClose={closeEditor}
+          description="הוספה, עריכה, סידור ומחיקה של שדות — יופיעו בטופס ובכרטיס מיד."
+          footer={<button type="button" className="btn btn-primary" onClick={closeEditor}>סיום</button>}>
+          <CustomFieldsAdmin entity={entityType} />
+        </Dialog>
+      )}
     </div>
   );
 }

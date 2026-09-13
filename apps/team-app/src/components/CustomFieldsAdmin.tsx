@@ -7,8 +7,11 @@ import { CF_TYPES, type CustomField } from './CustomFields';
 const hasOptions = (t: string) => t === 'select' || t === 'multiselect';
 const newKey = () => 'cf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-export default function CustomFieldsAdmin() {
-  const [entity, setEntity] = useState(CUSTOM_FIELD_ENTITIES[0]?.key ?? 'candidate');
+// entity קבוע (מהעורך ה-inline בטופס) נועל את הסוג ומסתיר את הבורר;
+// בלעדיו (הגדרות) הבורר מוצג ומאפשר מעבר בין הסוגים.
+export default function CustomFieldsAdmin({ entity: fixed }: { entity?: string } = {}) {
+  const [picked, setPicked] = useState(CUSTOM_FIELD_ENTITIES[0]?.key ?? 'candidate');
+  const entity = fixed ?? picked;
   const [rows, setRows] = useState<CustomField[]>([]);
   const [err, setErr] = useState('');
 
@@ -43,11 +46,13 @@ export default function CustomFieldsAdmin() {
   return (
     <div className="card" style={{ padding: 18, display: 'grid', gap: 14 }}>
       <div className="spread">
-        <label style={{ maxWidth: 260 }}><span className="lbl">סוג ישות</span>
-          <select value={entity} onChange={e => setEntity(e.target.value)}>
-            {CUSTOM_FIELD_ENTITIES.map(en => <option key={en.key} value={en.key}>{en.label}</option>)}
-          </select></label>
-        <button className="btn btn-quiet btn-sm" onClick={add}>+ שדה</button>
+        {fixed ? <span /> : (
+          <label style={{ maxWidth: 260 }}><span className="lbl">סוג ישות</span>
+            <select value={picked} onChange={e => setPicked(e.target.value)}>
+              {CUSTOM_FIELD_ENTITIES.map(en => <option key={en.key} value={en.key}>{en.label}</option>)}
+            </select></label>
+        )}
+        <button type="button" className="btn btn-quiet btn-sm" onClick={add}>+ שדה</button>
       </div>
       {err && <p className="msg err">{err}</p>}
       <p className="hint">השדות שתגדירו כאן יופיעו בכרטיס ובטופס העריכה של הישות שנבחרה — בלי צורך במפתח.</p>
@@ -60,9 +65,9 @@ export default function CustomFieldsAdmin() {
                 <label><span className="lbl">שם השדה</span><input defaultValue={f.label} onBlur={e => e.target.value !== f.label && patch(f.id, { label: e.target.value })} /></label>
                 <label><span className="lbl">סוג</span><select value={f.type} onChange={e => patch(f.id, { type: e.target.value })}>{CF_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn btn-quiet btn-sm" onClick={() => move(i, -1)} title="למעלה">↑</button>
-                  <button className="btn btn-quiet btn-sm" onClick={() => move(i, 1)} title="למטה">↓</button>
-                  <button className="btn btn-quiet btn-sm" onClick={() => del(f.id)} title="מחיקה">🗑</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => move(i, -1)} title="למעלה">↑</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => move(i, 1)} title="למטה">↓</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => del(f.id)} title="מחיקה">🗑</button>
                 </div>
               </div>
               <label><span className="lbl">הסבר (רשות)</span><input defaultValue={f.help ?? ''} onBlur={e => (e.target.value || null) !== (f.help ?? null) && patch(f.id, { help: e.target.value || null })} /></label>
