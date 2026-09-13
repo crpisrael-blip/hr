@@ -2,10 +2,11 @@
 // הפריסה (סדר/הסתרה/תווית/רוחב) נשמרת ב-app.form_layouts כמערך slots לפי סדר.
 // אין שורה = ברירת המחדל שבקוד (JOB_BUILTINS) ואחריה השדות המותאמים.
 import { supabase } from './supabase';
+import { COMPANY_STATUS, TASK_PRIORITY, TASK_COMPLETION, ROLE, EMP_STATUS } from './format';
 import type { CustomField } from '../components/CustomFields';
 
 export type FieldWidget =
-  | 'text' | 'textarea' | 'number' | 'date' | 'boolean' | 'select' | 'multiselect'
+  | 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'boolean' | 'select' | 'multiselect'
   | 'company' | 'scope';
 export type FieldWidth = 'full' | 'half' | 'third';
 
@@ -16,7 +17,10 @@ export interface BuiltinField {
   required?: boolean;    // חובה (מוצג עם *)
   locked?: boolean;      // חובה במסד ללא ברירת מחדל — אי אפשר להסתיר/למחוק
   width?: FieldWidth;
+  options?: { value: string; label: string }[]; // לרשימות בחירה מובנות (enum)
 }
+
+const opts = (m: Record<string, string>) => Object.entries(m).map(([value, label]) => ({ value, label }));
 
 // slot בפריסה: הפניה לשדה מובנה או מותאם, עם דריסות אופציונליות.
 export interface Slot { ref: string; label?: string; hidden?: boolean; width?: FieldWidth }
@@ -43,6 +47,56 @@ export const JOB_BUILTINS: BuiltinField[] = [
   { column: 'salary_max',           label: 'שכר עד',      widget: 'number',   width: 'third' },
 ];
 
+// מועמד. full_name חובה במסד ללא ברירת מחדל → נעול. טלפון/כישורים מטופלים
+// בקואורסיה ייעודית בטופס (נרמול, CSV→מערך).
+export const CANDIDATE_BUILTINS: BuiltinField[] = [
+  { column: 'full_name',        label: 'שם מלא',    widget: 'text',     required: true, locked: true, width: 'full' },
+  { column: 'phone_raw',        label: 'טלפון',     widget: 'text',     width: 'half' },
+  { column: 'email',            label: 'דוא״ל',     widget: 'text',     width: 'half' },
+  { column: 'skills',           label: 'כישורים',   widget: 'text',     width: 'full' },
+  { column: 'years_experience', label: 'שנות ניסיון', widget: 'number', width: 'third' },
+  { column: 'desired_salary',   label: 'שכר רצוי',  widget: 'number',   width: 'third' },
+  { column: 'availability',     label: 'זמינות',    widget: 'text',     width: 'third' },
+  { column: 'source',           label: 'מקור',      widget: 'text',     width: 'half' },
+];
+
+// לקוח. name נעול.
+export const COMPANY_BUILTINS: BuiltinField[] = [
+  { column: 'name',        label: 'שם החברה',  widget: 'text',     required: true, locked: true, width: 'full' },
+  { column: 'status',      label: 'סטטוס',     widget: 'select',   width: 'half', options: opts(COMPANY_STATUS) },
+  { column: 'business_id', label: 'ח״פ / עוסק', widget: 'text',    width: 'half' },
+  { column: 'website',     label: 'אתר',       widget: 'text',     width: 'full' },
+  { column: 'notes',       label: 'הערות',     widget: 'textarea', width: 'full' },
+];
+
+// עובד/מגייס. full_name ו-email חובה במסד → נעולים. role/employment_status
+// נאכפים גם בצד השרת (טריגר guard).
+export const EMPLOYEE_BUILTINS: BuiltinField[] = [
+  { column: 'full_name',         label: 'שם מלא',       widget: 'text',   required: true, locked: true, width: 'half' },
+  { column: 'email',             label: 'דוא״ל',        widget: 'text',   required: true, locked: true, width: 'half' },
+  { column: 'phone',             label: 'טלפון',        widget: 'text',   width: 'half' },
+  { column: 'job_title',         label: 'תפקיד/משרה',   widget: 'text',   width: 'half' },
+  { column: 'role',              label: 'תפקיד במערכת', widget: 'select', width: 'half', options: opts(ROLE) },
+  { column: 'employment_status', label: 'סטטוס העסקה',  widget: 'select', width: 'half', options: opts(EMP_STATUS) },
+  { column: 'hire_date',         label: 'תחילת עבודה',  widget: 'date',   width: 'half' },
+  { column: 'notes',             label: 'הערות',        widget: 'textarea', width: 'full' },
+];
+
+// משימה. title נעול. האחראים מנוהלים בקטע ייעודי מחוץ לפריסה (טבלה נפרדת).
+export const TASK_BUILTINS: BuiltinField[] = [
+  { column: 'title',           label: 'כותרת',       widget: 'text',     required: true, locked: true, width: 'full' },
+  { column: 'description',     label: 'תיאור',       widget: 'textarea', width: 'full' },
+  { column: 'priority',        label: 'עדיפות',      widget: 'select',   width: 'half', options: opts(TASK_PRIORITY) },
+  { column: 'due_at',          label: 'תאריך יעד',   widget: 'datetime', width: 'half' },
+  { column: 'completion_rule', label: 'כלל השלמה',   widget: 'select',   width: 'full', options: opts(TASK_COMPLETION) },
+];
+
+// מיפוי סוג ישות → רישום השדות המובנים שלה (לבנאי ולרינדור).
+export const BUILTINS_BY_ENTITY: Record<string, BuiltinField[]> = {
+  job: JOB_BUILTINS, candidate: CANDIDATE_BUILTINS, company: COMPANY_BUILTINS,
+  employee: EMPLOYEE_BUILTINS, task: TASK_BUILTINS,
+};
+
 const refBuiltin = (b: BuiltinField) => 'builtin:' + b.column;
 const refCustom = (c: CustomField) => 'custom:' + c.key;
 
@@ -62,7 +116,7 @@ export function effectiveFields(builtins: BuiltinField[], custom: CustomField[],
         ref, kind: 'builtin', column: b.column, label: slot?.label || b.label, widget: b.widget,
         required: !!b.required, locked: !!b.locked,
         hidden: b.locked ? false : !!slot?.hidden,       // נעול תמיד גלוי
-        width: slot?.width || b.width || 'full',
+        width: slot?.width || b.width || 'full', options: b.options,
       });
       return;
     }

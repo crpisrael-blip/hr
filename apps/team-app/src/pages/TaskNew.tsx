@@ -1,25 +1,45 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
+import { useAuth, isSuperadmin } from '../lib/auth';
 import { isTaskLinkEntity } from '../lib/entities';
-import { TASK_PRIORITY, TASK_COMPLETION } from '../lib/format';
 import { toUserMessage } from '../lib/errors';
+import { effectiveFields, TASK_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
+import type { CustomField } from '../components/CustomFields';
+import FieldInput from '../components/FieldInput';
+import FormLayoutEditor from '../components/FormLayoutEditor';
 import PageHead from '../components/PageHead';
+import Dialog from '../components/Dialog';
 import { Msg } from '../components/Msg';
 
 interface EmployeeOption { id: string; full_name: string }
+const SPAN: Record<string, number> = { full: 6, half: 3, third: 2 };
 
 export default function TaskNew() {
   const nav = useNavigate();
   const [sp] = useSearchParams();
   const { employee } = useAuth();
   const meId = employee?.id ?? null;
+  const canBuild = isSuperadmin(employee);
+
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [f, setF] = useState({ title: '', description: '', priority: 'normal', due_at: '', completion_rule: 'all_assignees' });
+  const [custom, setCustom] = useState<CustomField[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [values, setValues] = useState<Record<string, any>>({ 'builtin:priority': 'normal', 'builtin:completion_rule': 'all_assignees' });
   const [assignees, setAssignees] = useState<string[]>([]);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const set = (k: string, v: string) => setF(s => ({ ...s, [k]: v }));
+
+  const fields = useMemo(() => effectiveFields(TASK_BUILTINS, custom, slots), [custom, slots]);
+
+  async function reloadMeta() {
+    const [cf, lay] = await Promise.all([
+      supabase.from('custom_fields').select('*').eq('entity_type', 'task').eq('active', true).order('sort'),
+      supabase.from('form_layouts').select('slots').eq('entity_type', 'task').maybeSingle(),
+    ]);
+    if (!cf.error) setCustom((cf.data as CustomField[]) ?? []);
+    setSlots((lay.data?.slots as Slot[]) ?? []);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -29,33 +49,49 @@ export default function TaskNew() {
         if (r.error) { setErr(toUserMessage(r.error, 'טעינת רשימת העובדים נכשלה.')); return; }
         setEmployees(r.data as EmployeeOption[]);
       });
+    reloadMeta();
     return () => { alive = false; };
   }, []);
 
-  // ברירת מחדל: המשימה משויכת ליוצר. useAuth כבר מחזיק את מזהה העובד.
   useEffect(() => { if (meId) setAssignees(a => (a.length ? a : [meId])); }, [meId]);
 
+  const setVal = (ref: string, v: any) => setValues(s => ({ ...s, [ref]: v }));
   function toggle(id: string) { setAssignees(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]); }
 
+  function coerce(f: RenderField, v: any): unknown {
+    if (f.column === 'due_at') return v ? new Date(v).toISOString() : null;
+    if (f.widget === 'number') return v ? Number(v) : null;
+    if (f.widget === 'boolean') return !!v;
+    if (f.widget === 'multiselect') return Array.isArray(v) ? v : [];
+    return (typeof v === 'string' ? v.trim() : v) || null;
+  }
+
   async function onSubmit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
-    const { data, error } = await supabase.from('tasks').insert({
-      title: f.title.trim(), description: f.description.trim() || null, priority: f.priority,
-      due_at: f.due_at ? new Date(f.due_at).toISOString() : null, completion_rule: f.completion_rule,
-      source: 'manual', created_by: meId,
-    }).select('id').single();
+    e.preventDefault(); setErr('');
+    const visible = fields.filter(f => !f.hidden);
+    for (const f of visible) {
+      const v = values[f.ref];
+      const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
+      if (f.required && empty) { setErr(`שדה חובה: ${f.label}.`); return; }
+    }
+
+    const body: Record<string, unknown> = { source: 'manual', created_by: meId };
+    const customObj: Record<string, unknown> = {};
+    for (const f of visible) {
+      if (f.kind === 'builtin') body[f.column!] = coerce(f, values[f.ref]);
+      else customObj[f.cfKey!] = f.widget === 'boolean' ? !!values[f.ref] : (values[f.ref] ?? null);
+    }
+    body.custom = customObj;
+
+    setBusy(true);
+    const { data, error } = await supabase.from('tasks').insert(body).select('id').single();
     if (error || !data) { setErr(toUserMessage(error, 'יצירת המשימה נכשלה.')); setBusy(false); return; }
 
     const list = assignees.length ? assignees : (meId ? [meId] : []);
     if (list.length) {
       const ins = await supabase.from('task_assignees')
         .insert(list.map(eid => ({ task_id: data.id, employee_id: eid, added_by: meId })));
-      if (ins.error) {
-        // המשימה נוצרה אך ללא אחראים — לא מנווטים כאילו הכול הצליח.
-        setBusy(false);
-        setErr(toUserMessage(ins.error, 'המשימה נוצרה אך שיוך האחראים נכשל. פתחו את המשימה והוסיפו אחראים.'));
-        return;
-      }
+      if (ins.error) { setBusy(false); setErr(toUserMessage(ins.error, 'המשימה נוצרה אך שיוך האחראים נכשל. פתחו את המשימה והוסיפו אחראים.')); return; }
     }
 
     const linkType = sp.get('type'); const linkId = sp.get('id');
@@ -71,18 +107,15 @@ export default function TaskNew() {
 
   return (
     <>
-      <PageHead title="משימה חדשה" />
-      <form className="card" style={{ padding: 24, maxWidth: 600, display: 'grid', gap: 16 }} onSubmit={onSubmit}>
-        <label><span className="lbl">כותרת *</span><input value={f.title} onChange={e => set('title', e.target.value)} required autoFocus /></label>
-        <label><span className="lbl">תיאור</span><textarea value={f.description} onChange={e => set('description', e.target.value)} /></label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <label><span className="lbl">עדיפות</span>
-            <select value={f.priority} onChange={e => set('priority', e.target.value)}>
-              {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select></label>
-          <label><span className="lbl">תאריך יעד</span><input type="datetime-local" value={f.due_at} onChange={e => set('due_at', e.target.value)} /></label>
-        </div>
-        <fieldset className="asg-set">
+      <PageHead title="משימה חדשה"
+        action={canBuild ? <button type="button" className="btn btn-quiet btn-sm" onClick={() => setEditorOpen(true)}>✎ עריכת מבנה הטופס</button> : undefined} />
+      <form className="card" style={{ padding: 24, maxWidth: 620, display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 16 }} onSubmit={onSubmit}>
+        {fields.filter(f => !f.hidden).map(f => (
+          <div key={f.ref} style={{ gridColumn: `span ${SPAN[f.width] ?? 6}` }}>
+            <FieldInput field={f} value={values[f.ref]} onChange={v => setVal(f.ref, v)} />
+          </div>
+        ))}
+        <fieldset className="asg-set" style={{ gridColumn: '1 / -1' }}>
           <legend className="lbl">אחראים</legend>
           <div className="asg">
             {employees.map(e => (
@@ -93,12 +126,8 @@ export default function TaskNew() {
             ))}
           </div>
         </fieldset>
-        <label><span className="lbl">כלל השלמה</span>
-          <select value={f.completion_rule} onChange={e => set('completion_rule', e.target.value)}>
-            {Object.entries(TASK_COMPLETION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select></label>
-        <Msg kind="err">{err}</Msg>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ gridColumn: '1 / -1' }}><Msg kind="err">{err}</Msg></div>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10 }}>
           <button className="btn btn-primary" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button>
           <button type="button" className="btn btn-quiet" onClick={() => nav('/tasks')}>ביטול</button>
         </div>
@@ -109,6 +138,15 @@ export default function TaskNew() {
           .asg-item.on { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
         `}</style>
       </form>
+
+      {canBuild && (
+        <Dialog open={editorOpen} title="עריכת מבנה הטופס — משימה" wide
+          description="סדר, הסתרה, רוחב ותווית לשדות המובנים; הוספה/עריכה/מחיקה של שדות מכל סוג. האחראים מנוהלים בקטע נפרד."
+          onClose={() => { setEditorOpen(false); reloadMeta(); }}
+          footer={<button type="button" className="btn btn-primary" onClick={() => { setEditorOpen(false); reloadMeta(); }}>סיום</button>}>
+          <FormLayoutEditor entityType="task" builtins={TASK_BUILTINS} />
+        </Dialog>
+      )}
     </>
   );
 }
