@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
+import { useAuth, isManager } from '../lib/auth';
 import { ASSIGNABLE_ROLES, EMP_STATUS, EMPLOYEE_DOC_KIND, ROLE, formatDate, fmtSize, label, safeFileName } from '../lib/format';
 import { ALLOWED_UPLOAD_ACCEPT, ALLOWED_UPLOAD_MIME, MAX_UPLOAD_MB } from '../lib/config';
 import { useLoad, unwrap } from '../lib/useLoad';
@@ -28,12 +28,18 @@ const INVITE_ERR: Record<string, string> = {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { employee: me } = useAuth();
+  const canManage = isManager(me);
+  const isSelf = me?.id === id;
   const [form, setForm] = useState<EmployeeRow | null>(null);
   const [err, setErr] = useState(''); const [saved, setSaved] = useState('');
   const [inviteMsg, setInviteMsg] = useState({ text: '', kind: 'ok' as 'ok' | 'err' });
   const [inviting, setInviting] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const emp = unwrap(await supabase.from('employees')
@@ -80,6 +86,37 @@ export default function EmployeeDetail() {
     }
     setInviteMsg({ text: 'הזמנה נשלחה למייל. אחרי לחיצה על הקישור המגייס ייכנס ויקבע סיסמה.', kind: 'ok' });
     reload();
+  }
+
+  // הקפאה = השבתת סטטוס ההעסקה. הפיכה, ולכן בטוחה גם למגייס עם היסטוריה.
+  async function toggleFreeze() {
+    if (!form) return;
+    const next = form.employment_status === 'suspended' ? 'active' : 'suspended';
+    setErr(''); setSaved(''); setStatusBusy(true);
+    const { error } = await supabase.from('employees').update({ employment_status: next }).eq('id', id);
+    setStatusBusy(false);
+    if (error) { setErr(toUserMessage(error, 'שינוי סטטוס העובד נכשל.')); return; }
+    setForm({ ...form, employment_status: next });
+    setSaved(next === 'suspended' ? 'העובד הוקפא. הוא לא יוכל להיכנס למערכת עד להפעלה מחדש.' : 'העובד הופעל מחדש.');
+    reload();
+  }
+
+  // מחיקה אמיתית. מפתחות זרים רבים הם restrict — מגייס עם השמות/משימות/רשומות
+  // שיצר לא יימחק, וזה נכון: שגיאת 23503 מתורגמת להמלצה על הקפאה.
+  async function removeEmployee() {
+    setErr(''); setDelBusy(true);
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+    setDelBusy(false); setConfirmDel(false);
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === '23503') {
+        setErr('לא ניתן למחוק: למגייס יש רשומות מקושרות (השמות, משימות, מועמדים או פעולות שביצע). השתמשו ב"הקפאה" במקום — היא חוסמת כניסה בלי לפגוע בהיסטוריה.');
+        return;
+      }
+      setErr(toUserMessage(error, 'מחיקת העובד נכשלה.'));
+      return;
+    }
+    navigate('/employees');
   }
 
   if (loading) return <Loading />;
@@ -132,8 +169,51 @@ export default function EmployeeDetail() {
           <Feedback empId={id!} authorId={me?.id} rows={feedback} onChange={reload} />
         </div>
       </div>
+
+      {canManage && (
+        <div className="card danger-zone" style={{ padding: 20, marginTop: 16 }}>
+          <h2 className="sec">פעולות ניהול</h2>
+          {isSelf ? (
+            <p className="hint">אי אפשר להקפיא או למחוק את המשתמש שלך.</p>
+          ) : (
+            <>
+              <div className="dz-actions">
+                <div>
+                  <button type="button" className="btn btn-quiet btn-sm" disabled={statusBusy} onClick={toggleFreeze}>
+                    {statusBusy ? 'מעדכן…' : form.employment_status === 'suspended' ? 'הפעלה מחדש' : 'הקפאת מגייס'}
+                  </button>
+                  <p className="hint" style={{ marginTop: 6 }}>
+                    {form.employment_status === 'suspended'
+                      ? 'המגייס מוקפא כרגע — הכניסה למערכת חסומה.'
+                      : 'הקפאה חוסמת את הכניסה למערכת ושומרת את ההיסטוריה. הפיך.'}
+                  </p>
+                </div>
+                <div>
+                  <button type="button" className="btn btn-danger btn-sm" disabled={delBusy} onClick={() => setConfirmDel(true)}>
+                    מחיקת מגייס
+                  </button>
+                  <p className="hint" style={{ marginTop: 6 }}>מחיקה לצמיתות. אפשרית רק כשאין למגייס רשומות מקושרות.</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <Dialog open={confirmDel} title="מחיקת מגייס" onClose={() => setConfirmDel(false)}
+        description={emp.full_name}
+        footer={<>
+          <button className="btn btn-danger" disabled={delBusy} onClick={removeEmployee}>{delBusy ? 'מוחק…' : 'מחיקה לצמיתות'}</button>
+          <button className="btn btn-quiet" onClick={() => setConfirmDel(false)}>ביטול</button>
+        </>}>
+        <p>הפעולה בלתי הפיכה. אם למגייס יש השמות, משימות או רשומות שיצר — המחיקה תיחסם ותוצע הקפאה במקום.</p>
+      </Dialog>
+
       <style>{`
         .emp-grid { grid-template-columns: 1.2fr 1fr; }
+        .danger-zone { border-color: var(--line-strong); }
+        .dz-actions { display: flex; gap: 28px; flex-wrap: wrap; align-items: start; }
+        .dz-actions > div { flex: 1; min-width: 220px; }
         .doc-row, .fb-row { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
         .doc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .fb-row { display: grid; gap: 4px; }
