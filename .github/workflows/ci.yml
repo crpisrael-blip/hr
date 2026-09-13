@@ -23,6 +23,12 @@ jobs:
   build:
     name: בנייה, typecheck ו-drift של הסכימה
     runs-on: ubuntu-latest
+    # הבנייה כאן היא בדיקת קומפילציה, לא פריסה: האתר הציבורי נבנה ממשרות
+    # הדמה בלי לגעת במסד. astro.config.mjs/jobs.ts חוסמים בנייה כזו כש-CI
+    # מוגדר (K2/K3), ולכן מדליקים כאן את דגל ההיתר המפורש. Cloudflare לעולם
+    # אינו מגדיר אותו, כך שההגנה על פריסת הייצור נשמרת.
+    env:
+      ALLOW_DEMO_BUILD: '1'
     steps:
       - uses: actions/checkout@v4
 

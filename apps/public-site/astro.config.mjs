@@ -1,9 +1,17 @@
 import { defineConfig } from 'astro/config';
 
-// בנייה בייצור (Cloudflare Pages / CI) חייבת משתני סביבה אמיתיים.
+// בנייה בייצור (Cloudflare Pages/Workers) חייבת משתני סביבה אמיתיים.
 // בלעדיהם האתר היה עולה לאוויר עם משרות דמה (K3) או עם "מצב הדגמה"
 // שמציג הצלחה כוזבת ומשליך את המועמדות (K2). בפיתוח מקומי אין חסימה.
-const isProdBuild = Boolean(process.env.CI || process.env.CF_PAGES);
+//
+// GitHub Actions מגדיר CI=true גם לבדיקת קומפילציה שאינה פריסה, ושם מותר
+// לבנות ממשרות הדמה. הבדיקה של ה-CI מדליקה ALLOW_DEMO_BUILD=1 במפורש —
+// דגל שקובץ ה-workflow המבוקר בלבד מגדיר ו-Cloudflare לעולם לא, ולכן
+// ההגנה על הפריסה נשמרת במלואה.
+const allowDemoBuild = process.env.ALLOW_DEMO_BUILD === '1';
+const isProdBuild =
+  !allowDemoBuild &&
+  Boolean(process.env.CI || process.env.CF_PAGES || process.env.WORKERS_CI);
 if (isProdBuild) {
   const missing = ['PUBLIC_APPLY_ENDPOINT', 'DATABASE_URL'].filter(
     (k) => !process.env[k]?.trim(),

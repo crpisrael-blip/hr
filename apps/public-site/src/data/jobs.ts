@@ -62,8 +62,10 @@ async function fetchJobs(): Promise<Job[]> {
 
   if (!url) {
     // בייצור אסור לפרסם משרות דמה בשקט (K3). בפיתוח מקומי זו עדיין דרך
-    // נוחה לעבוד בלי מסד.
-    if (process.env.CI || process.env.CF_PAGES) {
+    // נוחה לעבוד בלי מסד. ALLOW_DEMO_BUILD=1 (בדיקת ה-CI בלבד) פותח את
+    // אותה נוחות גם כש-CI מוגדר — ראו ההערה ב-astro.config.mjs.
+    const allowDemoBuild = process.env.ALLOW_DEMO_BUILD === '1';
+    if (!allowDemoBuild && (process.env.CI || process.env.CF_PAGES || process.env.WORKERS_CI)) {
       throw new Error('[jobs] DATABASE_URL חסר בבניית ייצור. בלעדיו היו נצרבות לאתר משרות הדגמה.');
     }
     console.warn('[jobs] DATABASE_URL לא הוגדר — נבנה מנתוני הדגמה (פיתוח מקומי בלבד)');
