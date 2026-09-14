@@ -234,14 +234,25 @@ Deno.serve(async (req) => {
     const mime = cvKind === "pdf" ? "application/pdf"
       : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const up = await db.storage.from("candidate-docs").upload(path, cvBytes, { contentType: mime, upsert: false });
+    let cvFailed: string | null = null;
     if (up.error) {
       console.error("apply: cv upload:", up.error.message); // לא מפילים את ההגשה בגלל קובץ
+      cvFailed = up.error.message;
     } else {
       const doc = await db.from("documents").insert({
         candidate_id: candidateId, kind: "cv", storage_path: path,
         file_name: sanitizeName(cv!.name), mime_type: mime, size_bytes: cvBytes.length,
       });
-      if (doc.error) console.error("apply: document row:", doc.error.message);
+      if (doc.error) { console.error("apply: document row:", doc.error.message); cvFailed = doc.error.message; }
+    }
+    // כשל בקו״ח אינו מפיל את ההגשה (SPEC), אך נרשם כפעילות גלויה על המועמד כדי
+    // שהמגייס יראה שהקובץ חסר ויבקש מהמועמד לשלוח שוב — במקום כשל שקט.
+    if (cvFailed) {
+      const note = await db.from("activities").insert({
+        kind: "note", entity_type: "candidate", entity_id: candidateId,
+        body: "העלאת קורות החיים מההגשה דרך האתר נכשלה. יש לבקש מהמועמד לשלוח את הקובץ מחדש.",
+      });
+      if (note.error) console.error("apply: cv-fail note:", note.error.message);
     }
   }
 
