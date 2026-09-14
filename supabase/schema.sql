@@ -1,4 +1,4 @@
--- HR schema (0001..0028 merged for Supabase SQL Editor)
+-- HR schema (0001..0030 merged for Supabase SQL Editor)
 
 -- === 0001_foundation.sql ===
 -- 0001 · יסודות: סכמות, טיפוסים, משתמשים, הרשאות, הגדרות ויומן ביקורת
@@ -4267,3 +4267,45 @@ create policy form_layouts_update on app.form_layouts for update to authenticate
 drop policy if exists form_layouts_delete on app.form_layouts;
 create policy form_layouts_delete on app.form_layouts for delete to authenticated
   using ((select app.effective_scope('forms','delete')) <> 'none');
+
+-- === 0029_cv_ai_analysis.sql ===
+-- 0029 · הפעלת ניתוח קורות חיים ב-AI (Claude)
+-- התשתית קיימת מ-0003: app.document_analyses (הצעות עד לאישור אדם) ו-app.ai_status.
+-- כאן רק מוסיפים הגדרת מודל שניתנת לעריכה מהמערכת, ומרעננים תיאורים.
+-- ההפעלה בפועל: הדבקת ANTHROPIC_API_KEY בסודות ה-Edge Function, פריסת הפונקציה
+-- analyze-cv, והפעלת המתג ai.enabled מתוך הגדרות → AI. המפתח לעולם אינו בקוד/בדפדפן.
+
+-- ai.model — המודל שבו analyze-cv משתמשת. ברירת מחדל: Sonnet 5 (איזון דיוק/עלות).
+insert into app.settings (key, value, description) values
+  ('ai.model', '"claude-sonnet-5"', 'מודל ה-AI לניתוח קורות חיים')
+on conflict (key) do nothing;
+
+-- ריענון תיאורים לבהירות בממשק ההגדרות.
+update app.settings
+   set description = 'ניתוח קורות חיים ב-AI פעיל/כבוי'
+ where key = 'ai.enabled';
+update app.settings
+   set description = 'מכסת ניתוחים חודשית (0 = ללא הגבלה)'
+ where key = 'ai.monthly_quota';
+
+-- === 0030_staff_upload_candidate_docs.sql ===
+-- 0030 · העלאת מסמכי מועמד על ידי הצוות
+-- עד היום רק המועמד יכול היה להעלות לתיקייה של עצמו ב-candidate-docs
+-- (candidate_writes_own מ-0011), ולכן למגייס לא הייתה דרך להעלות קו״ח מהמערכת
+-- — למשל כשהקו״ח מההגשה הציבורית לא נקלט. כאן מוסיפים לצוות הרשאת העלאה
+-- ומחיקה בדלי. service_role ממשיך לעקוף RLS; שאר המדיניות ללא שינוי.
+-- הבלוק no-op בבטחה בסביבת בדיקות שבה אין schema של storage.
+do $$
+begin
+  if to_regclass('storage.objects') is not null then
+    drop policy if exists staff_writes_docs on storage.objects;
+    create policy staff_writes_docs on storage.objects for insert to authenticated
+      with check (bucket_id = 'candidate-docs' and app.is_staff());
+
+    -- מחיקה לצוות: מאפשרת ניקוי קובץ יתום בכשל רישום, והחלפת קו״ח.
+    -- עקבי עם הרשאת המחיקה שכבר קיימת לצוות על טבלת documents (0022).
+    drop policy if exists staff_deletes_docs on storage.objects;
+    create policy staff_deletes_docs on storage.objects for delete to authenticated
+      using (bucket_id = 'candidate-docs' and app.is_staff());
+  end if;
+end $$;

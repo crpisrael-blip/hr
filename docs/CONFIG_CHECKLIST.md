@@ -56,6 +56,15 @@
 ### 2.2 פונקציית `invite-employee` — ⚠️ תלויה ב-Resend + Redirect
 פרוסה, אך שליחת המייל תלויה בסעיף 4 (Resend) ובסעיף 3 (Redirect URLs).
 
+### 2.3 פונקציית `analyze-cv` — ניתוח קורות חיים ב-AI (חדש)
+פונקציה מאומתת (JWT). הפעלה חד-פעמית:
+- להריץ מיגרציות `0029` + `0030` ב-SQL Editor.
+- להוסיף סוד `ANTHROPIC_API_KEY` (מ-console.anthropic.com) ב-Edge Functions → Secrets.
+- לפרוס: `supabase functions deploy analyze-cv --project-ref jsxkwosjtjdypwedzxwx`
+  (או Dashboard → Edge Functions → הדבקת `supabase/functions/analyze-cv/index.ts`).
+- בהגדרות → **AI**: להדליק את המתג, לבחור מודל, לקבוע מכסה חודשית.
+- לפרוס מחדש את `apply` (תיקון: כשל בהעלאת קו״ח נרשם כפעילות גלויה במקום להיבלע).
+
 ---
 
 ## 3. Supabase — Authentication

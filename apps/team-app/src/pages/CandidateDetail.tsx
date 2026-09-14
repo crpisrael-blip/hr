@@ -9,13 +9,15 @@ import PageHead from '../components/PageHead';
 import Contact from '../components/Contact';
 import Dialog from '../components/Dialog';
 import FormsPanel from '../components/FormsPanel';
+import CvAnalysis from '../components/CvAnalysis';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsView } from '../components/CustomFields';
 
 interface Candidate {
   id: string; full_name: string; phone_raw: string | null; email: string | null;
-  skills: string[] | null; desired_salary: number | null; availability: string | null;
-  source: string | null; created_at: string; custom?: Record<string, unknown> | null;
+  years_experience: number | null; skills: string[] | null; desired_salary: number | null;
+  availability: string | null; source: string | null; created_at: string;
+  custom?: Record<string, unknown> | null;
 }
 interface Appl { id: string; stage: string; stage_changed_at: string; jobs: { title: string } | null }
 interface Doc { id: string; kind: string; file_name: string; storage_path: string; size_bytes: number; created_at: string }
@@ -30,7 +32,7 @@ export default function CandidateDetail() {
 
   const { data, err, loading, reload } = useLoad(async () => {
     const cand = unwrap(await supabase.from('candidates')
-      .select('id, full_name, phone_raw, email, skills, desired_salary, availability, source, created_at, custom')
+      .select('id, full_name, phone_raw, email, years_experience, skills, desired_salary, availability, source, created_at, custom')
       .eq('id', id).maybeSingle()) as Candidate | null;
     if (!cand) throw { code: 'PGRST116', message: 'candidate not found' };
     const [ar, dr, actr, fr] = await Promise.all([
@@ -70,6 +72,7 @@ export default function CandidateDetail() {
             <dt>טלפון</dt><dd><Contact kind="phone" value={c.phone_raw} /></dd>
             <dt>דוא״ל</dt><dd><Contact kind="email" value={c.email} /></dd>
             <dt>כישורים</dt><dd>{c.skills?.length ? c.skills.join(', ') : '—'}</dd>
+            <dt>ניסיון</dt><dd>{c.years_experience != null ? `${c.years_experience} שנים` : '—'}</dd>
             <dt>שכר רצוי</dt><dd>{money(c.desired_salary, 'ILS', 0)}</dd>
             <dt>זמינות</dt><dd>{c.availability ?? '—'}</dd>
             <dt>מקור</dt><dd>{c.source ?? '—'}</dd>
@@ -109,6 +112,14 @@ export default function CandidateDetail() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <CvAnalysis candidateId={id!} docs={docs}
+          candidate={{ full_name: c.full_name, email: c.email, phone_raw: c.phone_raw,
+            years_experience: c.years_experience, skills: c.skills,
+            desired_salary: c.desired_salary, availability: c.availability }}
+          onChange={reload} />
       </div>
 
       <div className="grid2" style={{ marginTop: 16 }}>
