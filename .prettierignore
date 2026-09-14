@@ -1,0 +1,13 @@
+# תוצרי בנייה ותלויות
+node_modules/
+dist/
+.output/
+.astro/
+.wrangler/
+**/*.tsbuildinfo
+
+# הסכימה המאוחדת נוצרת אוטומטית מהמיגרציות (npm run db:schema) — לא לפרמט ביד.
+supabase/schema.sql
+
+# package-lock מנוהל ע"י npm.
+package-lock.json

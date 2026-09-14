@@ -40,6 +40,11 @@ jobs:
       - name: install
         run: npm ci
 
+      # ESLint על שלוש האפליקציות (flat config בשורש). warnings אינם חוסמים
+      # (למשל any מכוון לשורות Supabase דינמיות); errors חוסמים. ראו eslint.config.js.
+      - name: lint
+        run: npm run lint
+
       # האתר הציבורי: בלי DATABASE_URL הוא נבנה ממשרות הדמה שב-src/data/fixtures,
       # ולכן הבנייה ב-CI אינה נוגעת במסד הייצור. PUBLIC_APPLY_ENDPOINT הוא
       # ערך דמה — רק כדי שהטופס ייבנה עם action תקין.

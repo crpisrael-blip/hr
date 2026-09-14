@@ -35,8 +35,8 @@ function safeJsonLd(value: unknown): string {
   // שובר את המפרסר.
   return JSON.stringify(value)
     .split('<').join('\\u003c')
-    .split(' ').join('\\u2028')
-    .split(' ').join('\\u2029');
+    .split('\u2028').join('\\u2028')
+    .split('\u2029').join('\\u2029');
 }
 const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---

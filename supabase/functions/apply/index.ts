@@ -54,7 +54,7 @@ function sniffFileType(bytes: Uint8Array): "pdf" | "docx" | null {
 }
 
 function sanitizeName(name: string): string {
-  return (name || "cv").replace(/[^\w.\-]+/g, "_").replace(/_{2,}/g, "_").slice(0, 100) || "cv";
+  return (name || "cv").replace(/[^\w.-]+/g, "_").replace(/_{2,}/g, "_").slice(0, 100) || "cv";
 }
 
 Deno.serve(async (req) => {

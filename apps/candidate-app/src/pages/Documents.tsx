@@ -74,7 +74,7 @@ export default function Documents() {
     if (!check.ok) { setErr(check.msg); return; }
 
     setBusy(true);
-    const safe = file.name.replace(/[^\w.\-]+/g, '_').replace(/\.{2,}/g, '.').slice(-120) || 'file';
+    const safe = file.name.replace(/[^\w.-]+/g, '_').replace(/\.{2,}/g, '.').slice(-120) || 'file';
     const path = `${candidateId}/${kind}/${Date.now()}-${safe}`;
 
     const up = await supabase.storage.from(DOCS_BUCKET).upload(path, file, {
