@@ -29,6 +29,8 @@ export default function TaskDetail() {
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [edit, setEdit] = useState({ title: '', description: '', priority: 'normal', due_at: '', completion_rule: 'all_assignees' });
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const task = unwrap(await supabase.from('tasks').select('*').eq('id', id).maybeSingle()) as Task | null;
@@ -49,6 +51,32 @@ export default function TaskDetail() {
     setBusy(false);
     if (error) { setErr(rpcErrorMessage(error, 'סימון המשימה כבוצעה')); return; }
     reload();
+  }
+
+  function openEdit(t: Task) {
+    // timestamptz → ערך datetime-local מקומי (YYYY-MM-DDTHH:mm).
+    let due = '';
+    if (t.due_at) {
+      const d = new Date(t.due_at);
+      due = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    setEdit({ title: t.title, description: t.description ?? '', priority: t.priority, due_at: due, completion_rule: t.completion_rule });
+    setErr(''); setEditOpen(true);
+  }
+
+  async function saveEdit() {
+    if (!edit.title.trim()) { setErr('נא להזין כותרת.'); return; }
+    setBusy(true); setErr('');
+    const { error } = await supabase.from('tasks').update({
+      title: edit.title.trim(),
+      description: edit.description.trim() || null,
+      priority: edit.priority,
+      due_at: edit.due_at ? new Date(edit.due_at).toISOString() : null,
+      completion_rule: edit.completion_rule,
+    }).eq('id', id);
+    setBusy(false);
+    if (error) { setErr(rpcErrorMessage(error, 'עדכון המשימה')); return; }
+    setEditOpen(false); reload();
   }
 
   async function cancelTask() {
@@ -72,7 +100,10 @@ export default function TaskDetail() {
     <>
       <PageHead title={t.title} sub={t.source === 'manual' ? 'משימה ידנית' : 'משימה אוטומטית'}
         action={t.status !== 'cancelled'
-          ? <button className="btn btn-quiet btn-sm" onClick={() => { setCancelReason(''); setCancelOpen(true); }}>ביטול משימה</button>
+          ? <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-quiet btn-sm" onClick={() => openEdit(t)}>עריכה</button>
+              <button className="btn btn-quiet btn-sm" onClick={() => { setCancelReason(''); setCancelOpen(true); }}>ביטול משימה</button>
+            </div>
           : undefined} />
       <Msg kind="err">{err}</Msg>
       <div className="grid2">
@@ -107,6 +138,30 @@ export default function TaskDetail() {
         <CustomFieldsCard entityType="task" initial={t.custom}
           onSave={async v => ({ error: (await supabase.from('tasks').update({ custom: v }).eq('id', id)).error })} />
       </div>
+
+      <Dialog open={editOpen} title="עריכת משימה" onClose={() => setEditOpen(false)} onSubmit={saveEdit}
+        footer={<>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</button>
+          <button type="button" className="btn btn-quiet" onClick={() => setEditOpen(false)}>ביטול</button>
+        </>}>
+        <label><span className="lbl">כותרת *</span>
+          <input value={edit.title} onChange={e => setEdit(s => ({ ...s, title: e.target.value }))} required autoFocus /></label>
+        <label><span className="lbl">תיאור</span>
+          <textarea value={edit.description} onChange={e => setEdit(s => ({ ...s, description: e.target.value }))} rows={3} /></label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <label><span className="lbl">עדיפות</span>
+            <select value={edit.priority} onChange={e => setEdit(s => ({ ...s, priority: e.target.value }))}>
+              {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select></label>
+          <label><span className="lbl">יעד</span>
+            <input type="datetime-local" value={edit.due_at} onChange={e => setEdit(s => ({ ...s, due_at: e.target.value }))} /></label>
+        </div>
+        <label><span className="lbl">כלל השלמה</span>
+          <select value={edit.completion_rule} onChange={e => setEdit(s => ({ ...s, completion_rule: e.target.value }))}>
+            {Object.entries(TASK_COMPLETION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></label>
+        <Msg kind="err">{err}</Msg>
+      </Dialog>
 
       <Dialog open={cancelOpen} title="ביטול משימה" onClose={() => setCancelOpen(false)} onSubmit={cancelTask}
         description="הביטול נשמר עם הסיבה ומופיע בכרטיס המשימה."
