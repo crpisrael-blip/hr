@@ -144,6 +144,17 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers });
   }
 
+  // הרשאת "ניתוח קו״ח ב-AI" — נבדקת בהקשר המשתמש (auth.uid) דרך המנוע הקיים.
+  // מנהלת/מנהל-על מקבלים אוטומטית; מגייס לפי המטריצה (ברירת מחדל: מותר).
+  const userScoped = createClient(url, anon, {
+    db: { schema: "app" }, auth: { persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+  const perm = await userScoped.rpc("has_permission", { p_module: "ai_analysis", p_action: "create" });
+  if (perm.error || perm.data !== true) {
+    return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers });
+  }
+
   // מתג הפעלה + מודל + מכסה חודשית (0 = ללא הגבלה). fail-closed על ההפעלה.
   const enabledRaw = await getSetting(svc, "ai.enabled");
   const enabled = enabledRaw === true || enabledRaw === "true";

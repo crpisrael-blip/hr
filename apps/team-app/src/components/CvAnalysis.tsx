@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 import { AI_STATUS, formatDateTime, label, money, safeFileName } from '../lib/format';
 import { MAX_UPLOAD_MB } from '../lib/config';
 import { toUserMessage } from '../lib/errors';
@@ -54,6 +55,8 @@ export default function CvAnalysis(
   { candidateId, candidate, docs, onChange }:
   { candidateId: string; candidate: CandidateNow; docs: CvDoc[]; onChange: () => void },
 ) {
+  const { can } = useAuth();
+  const canAnalyze = can('ai_analysis', 'create');
   const cvDocs = useMemo(() => docs.filter(d => d.kind === 'cv'), [docs]);
   const [rows, setRows] = useState<Analysis[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -107,6 +110,7 @@ export default function CvAnalysis(
   }, [activeId, rows]);
 
   async function analyze(docId: string) {
+    if (!canAnalyze) return;
     setBusyDoc(docId); setErr(''); setMsg('');
     const { data, error } = await supabase.functions.invoke('analyze-cv', { body: { document_id: docId } });
     setBusyDoc(null);
@@ -193,9 +197,11 @@ export default function CvAnalysis(
                 </span>
                 <span className="row-actions">
                   {a && a.id !== activeId && <button type="button" className="btn btn-quiet btn-sm" onClick={() => setActiveId(a.id)}>הצג</button>}
-                  <button type="button" className="btn btn-primary btn-sm" disabled={busyDoc !== null} onClick={() => analyze(d.id)}>
-                    {busyDoc === d.id ? 'מנתח…' : a ? 'נתח מחדש' : 'נתח ב-AI'}
-                  </button>
+                  {canAnalyze && (
+                    <button type="button" className="btn btn-primary btn-sm" disabled={busyDoc !== null} onClick={() => analyze(d.id)}>
+                      {busyDoc === d.id ? 'מנתח…' : a ? 'נתח מחדש' : 'נתח ב-AI'}
+                    </button>
+                  )}
                 </span>
               </li>
             );
