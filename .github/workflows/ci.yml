@@ -74,12 +74,12 @@ jobs:
           git diff --exit-code -- supabase/schema.sql \
             || { echo "::error file=supabase/schema.sql::schema.sql אינו תואם את supabase/migrations. הריצו npm run db:schema וקמטו את השינוי."; exit 1; }
 
-      # 5 פגיעויות ידועות נכון ל-2026-09, כולן נפתרות רק בשדרוגי major
-      # (astro@7, react-router-dom@7) — ראו docs/UPGRADES.md.
-      # continue-on-error נשאר עד שהשדרוגים האלה יבוצעו, ואז יש להסיר אותו.
+      # השדרוגים (astro@7, react-router-dom@7) בוצעו וכל פגיעויות הייצור נסגרו,
+      # ולכן הצעד הזה חוסם כעת (הוסר continue-on-error). ה-sharp הפגיע שנותר הוא
+      # dev-only דרך wrangler→miniflare (כלי פריסה, אינו נשלח לייצור) ולכן אינו
+      # נספר תחת --omit=dev. ראו docs/UPGRADES.md.
       - name: npm audit (production)
         run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
 
   db-test:
     name: מיגרציות ובדיקות כללי עסק
