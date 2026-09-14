@@ -15,8 +15,8 @@ import { Msg } from './Msg';
 interface Tpl { id: string; name: string; recipient_type: string; filing_category: string | null }
 interface Recipient { name?: string | null; email?: string | null; phone?: string | null }
 
-export default function SendForm({ entityKey, entityId, recipient, onSent, buttonLabel = '+ שליחת טופס' }:
-  { entityKey: string; entityId: string; recipient?: Recipient; onSent?: () => void; buttonLabel?: string }) {
+export default function SendForm({ entityKey, entityId, recipient, recipientKind, onSent, buttonLabel = '+ שליחת טופס' }:
+  { entityKey: string; entityId: string; recipient?: Recipient; recipientKind?: string; onSent?: () => void; buttonLabel?: string }) {
   const { employee } = useAuth();
   const [open, setOpen] = useState(false);
   const [tpls, setTpls] = useState<Tpl[]>([]);
@@ -29,8 +29,9 @@ export default function SendForm({ entityKey, entityId, recipient, onSent, butto
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  // סוג הנמען של הישות (candidate/client/staff). בלעדיו — רק טפסים כלליים.
-  const recKey = entityByKey(entityKey)?.recipient;
+  // סוג הנמען: override מפורש (למשל מועמדות/השמה ששולחות טופס-מועמד אך
+  // נקשרות להקשר שלהן), אחרת נגזר מהישות. בלעדיו — רק טפסים כלליים.
+  const recKey = recipientKind ?? entityByKey(entityKey)?.recipient;
 
   useEffect(() => {
     if (!open) return;

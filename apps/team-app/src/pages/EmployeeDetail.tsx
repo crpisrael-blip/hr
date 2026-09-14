@@ -12,6 +12,7 @@ import FieldInput from '../components/FieldInput';
 import FormLayoutEditor from '../components/FormLayoutEditor';
 import PageHead from '../components/PageHead';
 import Dialog from '../components/Dialog';
+import FormsPanel, { type FormInst } from '../components/FormsPanel';
 import { Msg, Loading } from '../components/Msg';
 
 const BUCKET = 'employee-docs';
@@ -67,12 +68,13 @@ export default function EmployeeDetail() {
       .select('id, full_name, email, phone, role, job_title, hire_date, employment_status, notes, user_id, invited_at, custom')
       .eq('id', id).maybeSingle()) as EmployeeRow | null;
     if (!emp) throw { code: 'PGRST116', message: 'employee not found' };
-    const [d, g] = await Promise.all([
+    const [d, g, fr] = await Promise.all([
       supabase.from('employee_documents').select('id, kind, file_name, storage_path, size_bytes, created_at').eq('employee_id', id).order('created_at', { ascending: false }),
       supabase.from('employee_feedback').select('id, rating, body, created_at').eq('employee_id', id).order('created_at', { ascending: false }),
+      supabase.from('form_instances').select('id, status, sent_at, completed_at, created_at, form_templates(name)').eq('entity_type', 'employee').eq('entity_id', id).order('created_at', { ascending: false }),
     ]);
     setForm(emp);
-    return { emp, docs: unwrap(d) as DocRow[], feedback: unwrap(g) as FeedbackRow[] };
+    return { emp, docs: unwrap(d) as DocRow[], feedback: unwrap(g) as FeedbackRow[], forms: unwrap(fr) as unknown as FormInst[] };
   }, [id]);
 
   async function saveDetails(ev: FormEvent) {
@@ -143,7 +145,7 @@ export default function EmployeeDetail() {
 
   if (loading) return <Loading />;
   if (loadErr || !data || !form) return <Msg kind="err">{loadErr || 'העובד לא נמצא.'}</Msg>;
-  const { emp, docs, feedback } = data;
+  const { emp, docs, feedback, forms } = data;
   const f = form;
   const getVal = (fld: RenderField) => fld.kind === 'builtin'
     ? (f as unknown as Record<string, any>)[fld.column!]
@@ -188,6 +190,7 @@ export default function EmployeeDetail() {
           </div>
           <Documents empId={id!} rows={docs} onChange={reload} />
           <Feedback empId={id!} authorId={me?.id} rows={feedback} onChange={reload} />
+          <FormsPanel entityKey="employee" entityId={id!} recipient={{ name: emp.full_name, email: emp.email, phone: emp.phone }} rows={forms} onSent={reload} emptyText="לא נשלחו טפסים לעובד." />
         </div>
       </div>
 
