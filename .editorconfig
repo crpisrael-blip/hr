@@ -1,0 +1,21 @@
+# סגנון עריכה אחיד לכל עורך. https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Markdown: רווחים בסוף שורה הם מעבר-שורה משמעותי — לא לגזום.
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefile ותסריטי shell — טאבים.
+[Makefile]
+indent_style = tab
+
+[*.sh]
+indent_size = 2

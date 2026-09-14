@@ -98,10 +98,15 @@
 
 ## מה שאינו פגיעות אבל כדאי באותה הזדמנות
 
-- **`npm dedupe`** — 3 גרסאות של `esbuild`, 2 של `sharp`, ו-`@emnapi/runtime`
-  מסומן `extraneous`. לא לרוץ יחד עם שדרוג major; קומיט נפרד.
-- **אין ESLint / Prettier / `.editorconfig`** בריפו, ואין אף `*.test.*` בשלוש
-  האפליקציות. שקלו ESLint flat config + Prettier, ו-Vitest ל-`src/lib/`.
+- **`npm dedupe`** — ✅ בוצע. מה שנותר (`esbuild`, `sharp` בכמה גרסאות) נעול
+  על ידי טווחים לא-תואמים של `astro`/`vite`/`wrangler` ויתקפל רק עם שדרוגי
+  ה-major למעלה.
+- **ESLint / Prettier / `.editorconfig`** — ✅ נוספו. `eslint.config.js` (flat
+  config, רמת recommended) נאכף ב-CI (`npm run lint`, 0 errors; warnings אינם
+  חוסמים — `any` מכוון לשורות Supabase). Prettier (`npm run format`) זמין אך
+  **אינו** נאכף: הקוד מיישר עמודות ביד במכוון, ו-reformat גורף היה מוחק זאת.
+- **אין אף `*.test.*`** בשלוש האפליקציות. עדיין פתוח: Vitest ל-`src/lib/`
+  (לוגיקת פורמט/טפסים/שלבים אינה מכוסה; בדיקות ה-SQL מכסות רק את המסד).
 - **דריפט בין האפליקציות** — `apps/team-app` ו-`apps/candidate-app` מחזיקות
   `tsconfig.json` ו-`vite.config.ts` כמעט זהים. ניתן לאחד ל-`tsconfig.base.json`
   בשורש בלי לפגוע במודל המידור (קונפיג אינו קוד רץ משותף).
