@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth, isSuperadmin } from '../lib/auth';
+import { useAuth } from '../lib/auth';
 import { isTaskLinkEntity } from '../lib/entities';
 import { toUserMessage } from '../lib/errors';
 import { effectiveFields, TASK_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
@@ -18,9 +18,9 @@ const SPAN: Record<string, number> = { full: 6, half: 3, third: 2 };
 export default function TaskNew() {
   const nav = useNavigate();
   const [sp] = useSearchParams();
-  const { employee } = useAuth();
+  const { employee, can } = useAuth();
   const meId = employee?.id ?? null;
-  const canBuild = isSuperadmin(employee);
+  const canBuild = can('forms', 'edit');
 
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [custom, setCustom] = useState<CustomField[]>([]);

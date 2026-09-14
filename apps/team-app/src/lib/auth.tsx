@@ -20,11 +20,15 @@ interface AuthState {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshEmployee: () => Promise<void>;
+  /** האם למשתמש יש הרשאה (היקף אפקטיבי > none) על (מודול, פעולה). נשען על
+   *  app.my_permissions. לפני שההרשאות נטענו — נופל לפי סמכות ניהול, כדי לא
+   *  לחסום מנהלים על מסד ישן שאין בו את ה-view. */
+  can: (module: string, action: string) => boolean;
 }
 
 const Ctx = createContext<AuthState>({
   session: null, employee: null, linkState: 'none', linkError: '', loading: true,
-  signOut: async () => {}, refreshEmployee: async () => {},
+  signOut: async () => {}, refreshEmployee: async () => {}, can: () => false,
 });
 export const useAuth = () => useContext(Ctx);
 
@@ -38,10 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [linkState, setLinkState] = useState<LinkState>('none');
   const [linkError, setLinkError] = useState('');
   const [loading, setLoading] = useState(true);
+  // null = טרם נטען (או מסד ישן ללא my_permissions) → can נופל לסמכות ניהול.
+  const [perms, setPerms] = useState<Set<string> | null>(null);
   const lastUid = useRef<string | null>(null);
 
   const loadEmployee = useCallback(async (s: Session | null) => {
-    if (!s) { setEmployee(null); setLinkState('none'); setLinkError(''); return; }
+    if (!s) { setEmployee(null); setLinkState('none'); setLinkError(''); setPerms(null); return; }
     const { data, error } = await supabase
       .from('employees')
       .select('id, full_name, email, role, employment_status')
@@ -58,6 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!emp) { setEmployee(null); setLinkState('none'); return; }
     if (emp.employment_status !== 'active') { setEmployee(null); setLinkState('suspended'); return; }
     setEmployee(emp); setLinkState('ok');
+    // ההרשאות האפקטיביות של המשתמש. כשל (מסד ישן ללא ה-view) → null, ו-can
+    // נופל לסמכות ניהול כדי לא לחסום מנהלים.
+    const perm = await supabase.from('my_permissions').select('module, action');
+    if (perm.error || !perm.data) setPerms(null);
+    else setPerms(new Set((perm.data as { module: string; action: string }[]).map(p => `${p.module}|${p.action}`)));
   }, []);
 
   useEffect(() => {
@@ -83,9 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => { await supabase.auth.signOut(); };
   const refreshEmployee = async () => { await loadEmployee(session); };
+  const can = useCallback((module: string, action: string) => {
+    if (perms) return perms.has(`${module}|${action}`);
+    return isManager(employee); // fallback לפני טעינה / מסד ישן
+  }, [perms, employee]);
 
   return (
-    <Ctx.Provider value={{ session, employee, linkState, linkError, loading, signOut, refreshEmployee }}>
+    <Ctx.Provider value={{ session, employee, linkState, linkError, loading, signOut, refreshEmployee, can }}>
       {children}
     </Ctx.Provider>
   );
