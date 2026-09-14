@@ -112,8 +112,10 @@
   config, רמת recommended) נאכף ב-CI (`npm run lint`, 0 errors; warnings אינם
   חוסמים — `any` מכוון לשורות Supabase). Prettier (`npm run format`) זמין אך
   **אינו** נאכף: הקוד מיישר עמודות ביד במכוון, ו-reformat גורף היה מוחק זאת.
-- **אין אף `*.test.*`** בשלוש האפליקציות. עדיין פתוח: Vitest ל-`src/lib/`
-  (לוגיקת פורמט/טפסים/שלבים אינה מכוסה; בדיקות ה-SQL מכסות רק את המסד).
+- **Vitest ל-`src/lib`/`src/data`** — ✅ נוסף. `vitest.config.ts` בשורש, נאכף
+  ב-CI (`npm test`). 65 בדיקות המכסות `format`, `dates`, `stages`,
+  `formLayout` (מנוע המיזוג) ו-`jobs` (עיצוב/סינון). כיסוי עתידי אפשרי:
+  לוגיקת רכיבי React (דורש `jsdom` + `@testing-library/react`).
 - **דריפט בין האפליקציות** — `apps/team-app` ו-`apps/candidate-app` מחזיקות
   `tsconfig.json` ו-`vite.config.ts` כמעט זהים. ניתן לאחד ל-`tsconfig.base.json`
   בשורש בלי לפגוע במודל המידור (קונפיג אינו קוד רץ משותף).

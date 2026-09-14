@@ -45,6 +45,11 @@ jobs:
       - name: lint
         run: npm run lint
 
+      # בדיקות יחידה ללוגיקה הטהורה (src/lib, src/data) עם Vitest. סביבת node,
+      # בלי מסד ובלי רשת. ראו vitest.config.ts.
+      - name: test
+        run: npm test
+
       # האתר הציבורי: בלי DATABASE_URL הוא נבנה ממשרות הדמה שב-src/data/fixtures,
       # ולכן הבנייה ב-CI אינה נוגעת במסד הייצור. PUBLIC_APPLY_ENDPOINT הוא
       # ערך דמה — רק כדי שהטופס ייבנה עם action תקין.
