@@ -75,6 +75,8 @@ function Cashflow() {
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState(''); const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(false);
+  const [scopeAll, setScopeAll] = useState(false);
+  const [cur, setCur] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
 
   async function load() {
     setLoading(true); setErr('');
@@ -85,37 +87,78 @@ function Cashflow() {
   }
   useEffect(() => { load(); }, []);
 
-  const totalExpected = rows.reduce((s,r)=>s+Number(r.expected_amount),0);
-  const totalReceived = rows.reduce((s,r)=>s+Number(r.received_amount),0);
+  const monthKey = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-01`;
+  const scoped = scopeAll ? rows : rows.filter(r => r.month === monthKey);
+
+  const totalExpected = scoped.reduce((s,r)=>s+Number(r.expected_amount),0);
+  const totalReceived = scoped.reduce((s,r)=>s+Number(r.received_amount),0);
 
   const byMonth = new Map<string, { expected:number; received:number }>();
   for (const r of rows) {
-    const cur = byMonth.get(r.month) ?? { expected:0, received:0 };
-    cur.expected += Number(r.expected_amount); cur.received += Number(r.received_amount);
-    byMonth.set(r.month, cur);
+    const m = byMonth.get(r.month) ?? { expected:0, received:0 };
+    m.expected += Number(r.expected_amount); m.received += Number(r.received_amount);
+    byMonth.set(r.month, m);
   }
   const months = [...byMonth.entries()].sort((a,b)=> a[0] < b[0] ? -1 : 1);
-  const detailRows = rows.slice().sort((a,b)=> a.due_date < b.due_date ? -1 : 1);
+  const detailRows = scoped.slice().sort((a,b)=> a.due_date < b.due_date ? -1 : 1);
+
+  const detailTable = (
+    <div className="card" style={{ overflow:'hidden' }}>
+      <table>
+        <thead><tr><th>מועמד</th><th>לקוח</th><th>תשלום</th><th>מועד</th><th>סכום</th><th>התקבל</th><th>מצב</th></tr></thead>
+        <tbody>{detailRows.map((r,i) => (
+          <tr key={(r.invoice_id ?? 'p') + '-' + r.placement_id + '-' + r.seq + '-' + i}>
+            <td style={{ fontWeight:600 }}>{r.candidateName ?? '—'}</td>
+            <td>{r.companyName ?? '—'}</td>
+            <td className="num">{r.seq}</td>
+            <td className="num">{formatDate(r.due_date)}</td>
+            <td className="num">{money(Number(r.expected_amount))}</td>
+            <td className="num ok">{Number(r.received_amount) > 0 ? money(Number(r.received_amount)) : '—'}</td>
+            <td>{r.kind === 'projected'
+              ? <span className="tag mute">צפוי</span>
+              : <span className={'tag ' + invTone(r.status)}>{INVOICE_STATUS[r.status] ?? r.status}</span>}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div style={{ display:'grid', gap:16 }}>
       {err && <p className="msg err">{err}</p>}
+
+      {/* ניווט בין חודשים בתוך התזרים */}
+      <div className="cf-nav">
+        <div className="cf-months">
+          <button className="btn btn-quiet btn-sm" aria-label="חודש קודם" disabled={scopeAll}
+            onClick={()=>setCur(c=>new Date(c.getFullYear(), c.getMonth()-1, 1))}>‹</button>
+          <strong className="cf-lbl">{scopeAll ? 'כל החודשים' : monthLabel(monthKey)}</strong>
+          <button className="btn btn-quiet btn-sm" aria-label="חודש הבא" disabled={scopeAll}
+            onClick={()=>setCur(c=>new Date(c.getFullYear(), c.getMonth()+1, 1))}>›</button>
+          {!scopeAll && <button className="btn btn-quiet btn-sm" onClick={()=>{ const d=new Date(); setCur(new Date(d.getFullYear(), d.getMonth(), 1)); }}>החודש</button>}
+        </div>
+        <button className={'btn btn-sm ' + (scopeAll ? 'btn-primary' : 'btn-quiet')} onClick={()=>setScopeAll(a=>!a)}>
+          {scopeAll ? 'תצוגת חודש' : 'כל החודשים'}
+        </button>
+      </div>
+
       <div className="tiles">
-        <div className="tile"><span className="t-lbl">צפוי לגבייה</span><strong>{moneyRound(totalExpected)}</strong></div>
+        <div className="tile"><span className="t-lbl">צפוי לגבייה{scopeAll ? '' : ' · החודש'}</span><strong>{moneyRound(totalExpected)}</strong></div>
         <div className="tile ok"><span className="t-lbl">התקבל בפועל</span><strong>{moneyRound(totalReceived)}</strong></div>
         <div className="tile warn"><span className="t-lbl">נותר פתוח</span><strong>{moneyRound(totalExpected - totalReceived)}</strong></div>
       </div>
 
       {loading ? <div className="card empty">טוען…</div> :
-       rows.length === 0 ? <div className="card empty">אין הכנסות בתזרים כרגע. הכנסת השמה פעילה מופיעה כאן מרגע יצירתה.</div> : (
+       rows.length === 0 ? <div className="card empty">אין הכנסות בתזרים כרגע. הכנסת השמה פעילה מופיעה כאן מרגע יצירתה.</div> :
+       scopeAll ? (
         <>
           <div className="card" style={{ overflow:'hidden' }}>
             <div className="card-h">תזרים לפי חודש</div>
             <table>
               <thead><tr><th>חודש</th><th>צפוי</th><th>התקבל</th><th>פתוח</th></tr></thead>
               <tbody>{months.map(([m,v]) => (
-                <tr key={m}>
-                  <td>{monthLabel(m)}</td>
+                <tr key={m} className={m === monthKey ? 'cf-cur' : ''}>
+                  <td><button className="cf-mbtn" onClick={()=>{ const [y,mm]=m.split('-').map(Number); setCur(new Date(y, mm-1, 1)); setScopeAll(false); }}>{monthLabel(m)}</button></td>
                   <td className="num">{money(v.expected)}</td>
                   <td className="num ok">{v.received > 0 ? money(v.received) : '—'}</td>
                   <td className="num">{money(v.expected - v.received)}</td>
@@ -123,33 +166,24 @@ function Cashflow() {
               ))}</tbody>
             </table>
           </div>
-
           <button className="btn btn-quiet btn-sm" style={{ justifySelf:'start' }} onClick={()=>setDetail(d=>!d)}>
             {detail ? 'הסתרת פירוט' : 'פירוט לפי השמה'}
           </button>
-
-          {detail && (
-            <div className="card" style={{ overflow:'hidden' }}>
-              <table>
-                <thead><tr><th>מועמד</th><th>לקוח</th><th>תשלום</th><th>מועד</th><th>סכום</th><th>התקבל</th><th>מצב</th></tr></thead>
-                <tbody>{detailRows.map((r,i) => (
-                  <tr key={(r.invoice_id ?? 'p') + '-' + r.placement_id + '-' + r.seq + '-' + i}>
-                    <td style={{ fontWeight:600 }}>{r.candidateName ?? '—'}</td>
-                    <td>{r.companyName ?? '—'}</td>
-                    <td className="num">{r.seq}</td>
-                    <td className="num">{formatDate(r.due_date)}</td>
-                    <td className="num">{money(Number(r.expected_amount))}</td>
-                    <td className="num ok">{Number(r.received_amount) > 0 ? money(Number(r.received_amount)) : '—'}</td>
-                    <td>{r.kind === 'projected'
-                      ? <span className="tag mute">צפוי</span>
-                      : <span className={'tag ' + invTone(r.status)}>{INVOICE_STATUS[r.status] ?? r.status}</span>}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
+          {detail && detailTable}
         </>
+      ) : (
+        detailRows.length === 0
+          ? <div className="card empty">אין תנועות בחודש זה. נווטו לחודש אחר או עברו ל"כל החודשים".</div>
+          : detailTable
       )}
+
+      <style>{`
+        .cf-nav { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+        .cf-months { display:flex; align-items:center; gap:8px; }
+        .cf-lbl { min-width:9ch; text-align:center; }
+        .cf-mbtn { background:none; border:none; padding:0; color:var(--brand); font:inherit; font-weight:600; cursor:pointer; }
+        tr.cf-cur { background:var(--sunk); }
+      `}</style>
     </div>
   );
 }
