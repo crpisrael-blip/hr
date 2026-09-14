@@ -1,4 +1,4 @@
--- HR schema (0001..0027 merged for Supabase SQL Editor)
+-- HR schema (0001..0028 merged for Supabase SQL Editor)
 
 -- === 0001_foundation.sql ===
 -- 0001 · יסודות: סכמות, טיפוסים, משתמשים, הרשאות, הגדרות ויומן ביקורת
@@ -4162,27 +4162,34 @@ create trigger jobs_stage_rebuild
   execute function app.notify_site_rebuild();
 
 -- === 0027_permission_engine.sql ===
--- 0027 · מודול "forms" (בניית טפסים) + חשיפת ההרשאות ל-UI.
+-- 0027 · הוספת מודול "forms" ל-enum ההרשאות — בלבד.
 --
--- הבהרה: מנוע ההרשאות (app.effective_scope / app.owner_in_scope) והמדיניות
--- מודעת-ה-scope כבר קיימים מ-0022 — הם מיושמים על טבלאות הליבה
--- (candidates/jobs/applications/employees) וצורכים את המטריצה
--- (permission_defaults → profiles → overrides). כאן מוסיפים:
---   1. מודול forms — "בנייה" של מבנה הטפסים, נבדל מ"שליחה" (שנשלטת דרך
---      הכרטיס הרלוונטי, candidate_messages).
---   2. app.my_permissions — ה-view שמסך הצוות מושך כדי להסתיר/לחסום פעולות.
---   3. app.has_permission — קיצור בוליאני מעל effective_scope הקיים.
---   4. חיווט טבלאות בניית-הטפסים (form_templates/form_layouts/custom_fields)
---      למודול forms במקום הגייטים הקשיחים והלא-אחידים שהיו (staff/manager/superadmin).
+-- למה קובץ נפרד: Postgres אוסר שימוש בערך enum חדש באותה טרנזקציה שהוסיפה
+-- אותו (SQLSTATE 55P04, "New enum values must be committed before they can be
+-- used"). ה-SQL Editor של Supabase עוטף כל סקריפט בטרנזקציה אחת, ולכן הוספת
+-- הערך והשימוש בו חייבים להיות בשני קבצים/הרצות נפרדות. כל מה שמשתמש ב-'forms'
+-- (הזרעה, פונקציות, view, מדיניות) נמצא ב-0028, שירוץ אחרי ש-0027 עשה commit.
+--
+-- forms = "בניית טפסים" (מבנה/layouts/custom_fields), נבדל מ"שליחת טופס"
+-- שנעשית מהכרטיס הרלוונטי ונשלטת ע"י candidate_messages.
 
--- ---------- מודול חדש ----------
--- ALTER TYPE ... ADD VALUE חייב לרוץ מחוץ לטרנזקציה; psql באוטוקומיט (הקובץ
--- ללא BEGIN) מבצע commit מיד, ולכן אפשר להשתמש ב-'forms' בהמשך הקובץ.
 alter type app.perm_module add value if not exists 'forms';
 
--- ברירות מחדל: מגייס — אין בנייה; מנהלת/מנהל על — בנייה מלאה. (בפועל
--- effective_scope מחזיר 'all' למנהלת/מנהל-על על הכול; שורות אלה נועדו כדי
--- שמסך המטריצה יציג את התא, ושאפשר יהיה להעניק בנייה למגייס דרך פרופיל/override.)
+-- === 0028_permission_forms_wiring.sql ===
+-- 0028 · חיווט מודול forms + חשיפת ההרשאות ל-UI.
+-- רץ אחרי ש-0027 (הוספת הערך 'forms' ל-enum) עשה commit — ראו ההסבר ב-0027.
+--
+-- המנוע (app.effective_scope / app.owner_in_scope) והמדיניות מודעת-ה-scope
+-- לטבלאות הליבה קיימים מ-0022. כאן:
+--   1. ברירות מחדל למודול forms.
+--   2. app.has_permission + view app.my_permissions (לקריאה מה-UI).
+--   3. חיווט טבלאות בניית-הטפסים (form_templates/form_layouts/custom_fields)
+--      למודול forms, במקום הגייטים הקשיחים הלא-אחידים שהיו.
+
+-- ---------- ברירות מחדל ----------
+-- מגייס — אין בנייה; מנהלת/מנהל על — בנייה מלאה. (בפועל effective_scope מחזיר
+-- 'all' למנהלת/מנהל-על על הכול; שורות אלה כדי שמסך המטריצה יציג את התא, ושאפשר
+-- יהיה להעניק בנייה למגייס דרך פרופיל/override.)
 insert into app.permission_defaults (role, module, action, scope)
 select r, 'forms'::app.perm_module, a, 'none'::app.perm_scope
 from unnest(array['recruiter','manager','superadmin']::app.user_role[]) r
@@ -4237,20 +4244,26 @@ create policy form_templates_delete on app.form_templates for delete to authenti
 
 -- custom_fields: היה write=manager → עכשיו לפי forms.
 drop policy if exists custom_fields_write on app.custom_fields;
+drop policy if exists custom_fields_insert on app.custom_fields;
 create policy custom_fields_insert on app.custom_fields for insert to authenticated
   with check ((select app.effective_scope('forms','create')) <> 'none');
+drop policy if exists custom_fields_update on app.custom_fields;
 create policy custom_fields_update on app.custom_fields for update to authenticated
   using ((select app.effective_scope('forms','edit')) <> 'none')
   with check ((select app.effective_scope('forms','edit')) <> 'none');
+drop policy if exists custom_fields_delete on app.custom_fields;
 create policy custom_fields_delete on app.custom_fields for delete to authenticated
   using ((select app.effective_scope('forms','delete')) <> 'none');
 
 -- form_layouts: היה write=superadmin → עכשיו לפי forms (מנהלת מקבלת גם היא).
 drop policy if exists form_layouts_write on app.form_layouts;
+drop policy if exists form_layouts_insert on app.form_layouts;
 create policy form_layouts_insert on app.form_layouts for insert to authenticated
   with check ((select app.effective_scope('forms','create')) <> 'none');
+drop policy if exists form_layouts_update on app.form_layouts;
 create policy form_layouts_update on app.form_layouts for update to authenticated
   using ((select app.effective_scope('forms','edit')) <> 'none')
   with check ((select app.effective_scope('forms','edit')) <> 'none');
+drop policy if exists form_layouts_delete on app.form_layouts;
 create policy form_layouts_delete on app.form_layouts for delete to authenticated
   using ((select app.effective_scope('forms','delete')) <> 'none');
