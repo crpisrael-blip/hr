@@ -29,7 +29,7 @@ const PlacementDetail = lazy(() => import('./pages/PlacementDetail'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settlements = lazy(() => import('./pages/Settlements'));
 const Settings = lazy(() => import('./pages/Settings'));
-const Soon = lazy(() => import('./pages/Soon'));
+const Calendar = lazy(() => import('./pages/Calendar'));
 const Employees = lazy(() => import('./pages/Employees'));
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
 const Forms = lazy(() => import('./pages/Forms'));
@@ -130,7 +130,7 @@ export default function App() {
           <Route path="/forms/instances/:id" element={<FormInstance />} />
           <Route path="/forms/:id" element={<FormBuilder />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/calendar" element={<Soon title="לוח שנה" />} />
+          <Route path="/calendar" element={<Calendar />} />
           {/* מסכי מנהלת בלבד: ללא הרשאה מפנים לדף הבית במקום להציג מסך שגיאה. */}
           <Route path="/employees" element={mgr ? <Employees /> : <Navigate to="/" replace />} />
           <Route path="/employees/:id" element={mgr ? <EmployeeDetail /> : <Navigate to="/" replace />} />
