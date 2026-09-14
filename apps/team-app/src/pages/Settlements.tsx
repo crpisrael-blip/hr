@@ -1,16 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, fin, enrichPlacements, applicantInfo, employeeNames } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { money, formatDate, PLACEMENT_STATUS } from '../lib/format';
+import { money, moneyRound, formatDate, PLACEMENT_STATUS, INVOICE_STATUS } from '../lib/format';
 import PageHead from '../components/PageHead';
 
 const METRIC: Record<string,string> = { placements_count: 'מספר השמות', commission_sum: 'סכום עמלות' };
 const BSTATUS: Record<string,string> = { draft:'טיוטה', review:'לבדיקה', approved:'מאושר', paid:'שולם' };
 
+// תווית חודש בעברית מתוך ערך תאריך "YYYY-MM-DD" של התצוגה.
+const monthLabel = (m: string) => {
+  const d = new Date(m.length === 7 ? m + '-01' : m);
+  return Number.isNaN(d.getTime()) ? m : d.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+};
+// גוון תגית לפי מצב חיוב.
+const invTone = (s: string) => s === 'paid' ? 'ok' : s === 'partially_paid' ? 'warn' : s === 'projected' ? 'mute' : 'brand';
+
 export default function Settlements() {
   const { employee } = useAuth();
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
-  const [section, setSection] = useState<'settlements'>('settlements');
+  const [section, setSection] = useState<'cashflow'|'billing'|'settlements'>('cashflow');
   const [tab, setTab] = useState<'monthly'|'plans'|'clawbacks'>('monthly');
   const [emps, setEmps] = useState<any[]>([]);
   useEffect(() => { supabase.from('employees').select('id, full_name').eq('employment_status','active').order('full_name').then(r=>{ if(!r.error) setEmps(r.data); }); }, []);
@@ -19,12 +27,16 @@ export default function Settlements() {
 
   return (
     <>
-      <PageHead title="כספים" sub="התחשבנות, חיובים ותקבולים" />
+      <PageHead title="כספים" sub="תזרים, חיובים, תקבולים והתחשבנות" />
       <div className="submenu">
+        <button className={section==='cashflow'?'on':''} onClick={()=>setSection('cashflow')}>תזרים</button>
+        <button className={section==='billing'?'on':''} onClick={()=>setSection('billing')}>חיובים ותקבולים</button>
         <button className={section==='settlements'?'on':''} onClick={()=>setSection('settlements')}>התחשבנות</button>
-        <button className="soon" disabled title="בקרוב">חיובים</button>
-        <button className="soon" disabled title="בקרוב">תקבולים</button>
       </div>
+
+      {section==='cashflow' && <Cashflow />}
+      {section==='billing' && <Billing />}
+
       {section==='settlements' && <>
       <div className="tabs">
         <button className={tab==='monthly'?'on':''} onClick={()=>setTab('monthly')}>בונוס חודשי</button>
@@ -35,16 +47,197 @@ export default function Settlements() {
       {tab==='plans' && <Plans emps={emps} />}
       {tab==='clawbacks' && <Clawbacks />}
       </>}
+
       <style>{`
-        .submenu { display:flex; gap:6px; margin-bottom:14px; }
+        .submenu { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
         .submenu button { background:var(--sunk); border:1px solid var(--line); border-radius:999px; padding:7px 16px; cursor:pointer; color:var(--ink-mid); font-weight:600; font-size:.9rem; }
         .submenu button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
-        .submenu button.soon { opacity:.5; cursor:default; }
         .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:16px; }
         .bar label { display:grid; gap:5px; }
         .bar .lbl { font-size:.82rem; font-weight:600; }
+        .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+        .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:grid; gap:4px; }
+        .tile .t-lbl { font-size:.82rem; color:var(--ink-mid); font-weight:600; }
+        .tile strong { font-size:1.35rem; }
+        .tile.ok { border-color:color-mix(in srgb, var(--ok, #1a7f5a) 45%, var(--line)); }
+        .tile.warn { border-color:color-mix(in srgb, var(--warn, #b45309) 45%, var(--line)); }
+        .card-h { padding:14px 16px; font-weight:700; border-bottom:1px solid var(--line); }
+        td.num.ok, .num.ok { color:var(--ok, #1a7f5a); }
       `}</style>
     </>
+  );
+}
+
+// ---------------------------------------------------------------- תזרים
+// מרגע ההשמה מופיעה הכנסתה הצפויה; עם אישור ההשמה התזרים נשען על חיובים
+// אמיתיים ועל סכום התקבול בפועל; השמה שנכשלה יוצאת מהתזרים.
+function Cashflow() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [err, setErr] = useState(''); const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState(false);
+
+  async function load() {
+    setLoading(true); setErr('');
+    const r = await fin.from('cashflow').select('*');
+    if (r.error) { setErr(r.error.message); setLoading(false); return; }
+    setRows(await enrichPlacements(r.data as any[]));
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  const totalExpected = rows.reduce((s,r)=>s+Number(r.expected_amount),0);
+  const totalReceived = rows.reduce((s,r)=>s+Number(r.received_amount),0);
+
+  const byMonth = new Map<string, { expected:number; received:number }>();
+  for (const r of rows) {
+    const cur = byMonth.get(r.month) ?? { expected:0, received:0 };
+    cur.expected += Number(r.expected_amount); cur.received += Number(r.received_amount);
+    byMonth.set(r.month, cur);
+  }
+  const months = [...byMonth.entries()].sort((a,b)=> a[0] < b[0] ? -1 : 1);
+  const detailRows = rows.slice().sort((a,b)=> a.due_date < b.due_date ? -1 : 1);
+
+  return (
+    <div style={{ display:'grid', gap:16 }}>
+      {err && <p className="msg err">{err}</p>}
+      <div className="tiles">
+        <div className="tile"><span className="t-lbl">צפוי לגבייה</span><strong>{moneyRound(totalExpected)}</strong></div>
+        <div className="tile ok"><span className="t-lbl">התקבל בפועל</span><strong>{moneyRound(totalReceived)}</strong></div>
+        <div className="tile warn"><span className="t-lbl">נותר פתוח</span><strong>{moneyRound(totalExpected - totalReceived)}</strong></div>
+      </div>
+
+      {loading ? <div className="card empty">טוען…</div> :
+       rows.length === 0 ? <div className="card empty">אין הכנסות בתזרים כרגע. הכנסת השמה פעילה מופיעה כאן מרגע יצירתה.</div> : (
+        <>
+          <div className="card" style={{ overflow:'hidden' }}>
+            <div className="card-h">תזרים לפי חודש</div>
+            <table>
+              <thead><tr><th>חודש</th><th>צפוי</th><th>התקבל</th><th>פתוח</th></tr></thead>
+              <tbody>{months.map(([m,v]) => (
+                <tr key={m}>
+                  <td>{monthLabel(m)}</td>
+                  <td className="num">{money(v.expected)}</td>
+                  <td className="num ok">{v.received > 0 ? money(v.received) : '—'}</td>
+                  <td className="num">{money(v.expected - v.received)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+
+          <button className="btn btn-quiet btn-sm" style={{ justifySelf:'start' }} onClick={()=>setDetail(d=>!d)}>
+            {detail ? 'הסתרת פירוט' : 'פירוט לפי השמה'}
+          </button>
+
+          {detail && (
+            <div className="card" style={{ overflow:'hidden' }}>
+              <table>
+                <thead><tr><th>מועמד</th><th>לקוח</th><th>תשלום</th><th>מועד</th><th>סכום</th><th>התקבל</th><th>מצב</th></tr></thead>
+                <tbody>{detailRows.map((r,i) => (
+                  <tr key={(r.invoice_id ?? 'p') + '-' + r.placement_id + '-' + r.seq + '-' + i}>
+                    <td style={{ fontWeight:600 }}>{r.candidateName ?? '—'}</td>
+                    <td>{r.companyName ?? '—'}</td>
+                    <td className="num">{r.seq}</td>
+                    <td className="num">{formatDate(r.due_date)}</td>
+                    <td className="num">{money(Number(r.expected_amount))}</td>
+                    <td className="num ok">{Number(r.received_amount) > 0 ? money(Number(r.received_amount)) : '—'}</td>
+                    <td>{r.kind === 'projected'
+                      ? <span className="tag mute">צפוי</span>
+                      : <span className={'tag ' + invTone(r.status)}>{INVOICE_STATUS[r.status] ?? r.status}</span>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------ חיובים ותקבולים
+// רשימת החיובים האמיתיים (מלוח התשלומים של ההשמות שאושרו) עם אישור קבלת תשלום
+// כשמגיע מועדו. אישור תקבול רושם תקבול ומעדכן את מצב החיוב (שולם / שולם חלקית).
+function Billing() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [err, setErr] = useState(''); const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true); setErr('');
+    const inv = await fin.from('invoices').select('*').neq('status','cancelled').order('due_date');
+    if (inv.error) { setErr(inv.error.message); setLoading(false); return; }
+    const invoices = inv.data as any[];
+
+    const schedIds = [...new Set(invoices.map(i => i.schedule_id))];
+    const scheds = schedIds.length ? await fin.from('payment_schedules').select('id, placement_id').in('id', schedIds) : { data: [] as any[] };
+    const schToPl: Record<string,string> = Object.fromEntries(((scheds.data ?? []) as any[]).map(s => [s.id, s.placement_id]));
+
+    const plIds = [...new Set(Object.values(schToPl))];
+    const pls = plIds.length ? await fin.from('placements').select('id, company_id, application_id, status').in('id', plIds) : { data: [] as any[] };
+    const enriched = await enrichPlacements((pls.data ?? []) as any[]);
+    const plMap: Record<string,any> = Object.fromEntries(enriched.map(p => [p.id, p]));
+
+    const invIds = invoices.map(i => i.id);
+    const allocs = invIds.length ? await fin.from('receipt_allocations').select('invoice_id, amount').in('invoice_id', invIds) : { data: [] as any[] };
+    const recvBy: Record<string,number> = {};
+    for (const a of (allocs.data ?? []) as any[]) recvBy[a.invoice_id] = (recvBy[a.invoice_id] ?? 0) + Number(a.amount);
+
+    setRows(invoices.map(i => {
+      const pl = plMap[schToPl[i.schedule_id]];
+      const received = recvBy[i.id] ?? 0;
+      return { ...i, _cand: pl?.candidateName ?? null, _co: pl?.companyName ?? null,
+        _plStatus: pl?.status ?? null, _received: received, _remaining: Number(i.amount) - received };
+    }));
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function confirm(inv: any) {
+    const amtStr = prompt(`סכום שהתקבל (יתרה לתשלום: ${inv._remaining}):`, String(inv._remaining));
+    if (amtStr === null) return;
+    const amount = Number(amtStr);
+    if (!Number.isFinite(amount) || amount <= 0) { setErr('סכום התקבול אינו תקין.'); return; }
+    const received = prompt('תאריך קבלה (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+    if (received === null) return;
+    const method = prompt('אמצעי תשלום (לא חובה):', 'העברה בנקאית') || null;
+    const { error } = await supabase.rpc('confirm_invoice_receipt',
+      { p_invoice: inv.id, p_amount: amount, p_received: received, p_method: method, p_ref: null });
+    if (error) setErr(error.message); else { setErr(''); load(); }
+  }
+  async function issue(inv: any) {
+    const { error } = await supabase.rpc('issue_invoice', { p_invoice: inv.id, p_external_ref: null });
+    if (error) setErr(error.message); else { setErr(''); load(); }
+  }
+
+  return (
+    <div style={{ display:'grid', gap:16 }}>
+      {err && <p className="msg err">{err}</p>}
+      {loading ? <div className="card empty">טוען…</div> :
+       rows.length === 0 ? <div className="card empty">אין חיובים. חיובים נוצרים עם אישור השמה (לפי לוח התשלומים בהסכם).</div> : (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <table>
+            <thead><tr><th>מועמד</th><th>לקוח</th><th>תשלום</th><th>מועד פירעון</th><th>סכום</th><th>התקבל</th><th>מצב</th><th></th></tr></thead>
+            <tbody>{rows.map(inv => (
+              <tr key={inv.id}>
+                <td style={{ fontWeight:600 }}>{inv._cand ?? '—'}</td>
+                <td>{inv._co ?? '—'}</td>
+                <td className="num">{inv.seq}</td>
+                <td className="num">{formatDate(inv.due_date)}</td>
+                <td className="num">{money(Number(inv.amount))}</td>
+                <td className="num ok">{inv._received > 0 ? money(inv._received) : '—'}</td>
+                <td><span className={'tag ' + invTone(inv.status)}>{INVOICE_STATUS[inv.status] ?? inv.status}</span></td>
+                <td>
+                  <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                    {inv.status === 'planned' && <button className="btn btn-quiet btn-sm" onClick={()=>issue(inv)}>הפקה</button>}
+                    {inv.status !== 'paid' && <button className="btn btn-primary btn-sm" onClick={()=>confirm(inv)}>אישור קבלה</button>}
+                    {inv.status === 'paid' && <span className="tag ok">שולם</span>}
+                  </div>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
