@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth, isSuperadmin } from '../lib/auth';
+import { useAuth } from '../lib/auth';
 import { toUserMessage } from '../lib/errors';
 import { effectiveFields, JOB_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
 import type { CustomField } from '../components/CustomFields';
@@ -18,8 +18,8 @@ export default function JobNew() {
   const nav = useNavigate();
   const { id } = useParams();
   const editing = !!id;
-  const { employee } = useAuth();
-  const canBuild = isSuperadmin(employee);
+  const { can } = useAuth();
+  const canBuild = can('forms', 'edit');
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [custom, setCustom] = useState<CustomField[]>([]);

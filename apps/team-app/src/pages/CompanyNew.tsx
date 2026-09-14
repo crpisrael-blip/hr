@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth, isSuperadmin } from '../lib/auth';
+import { useAuth } from '../lib/auth';
 import { safeUrl } from '../lib/format';
 import { toUserMessage } from '../lib/errors';
 import { effectiveFields, COMPANY_BUILTINS, type RenderField, type Slot } from '../lib/formLayout';
@@ -16,8 +16,8 @@ const SPAN: Record<string, number> = { full: 6, half: 3, third: 2 };
 
 export default function CompanyNew() {
   const nav = useNavigate();
-  const { employee } = useAuth();
-  const canBuild = isSuperadmin(employee);
+  const { can } = useAuth();
+  const canBuild = can('forms', 'edit');
   const [custom, setCustom] = useState<CustomField[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [values, setValues] = useState<Record<string, any>>({ 'builtin:status': 'active' });

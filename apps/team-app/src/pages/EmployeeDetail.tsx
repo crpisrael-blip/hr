@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth, isManager, isSuperadmin } from '../lib/auth';
+import { useAuth, isManager } from '../lib/auth';
 import { EMPLOYEE_DOC_KIND, ROLE, formatDate, fmtSize, label, safeFileName } from '../lib/format';
 import { ALLOWED_UPLOAD_ACCEPT, ALLOWED_UPLOAD_MIME, MAX_UPLOAD_MB } from '../lib/config';
 import { useLoad, unwrap } from '../lib/useLoad';
@@ -35,9 +35,9 @@ const INVITE_ERR: Record<string, string> = {
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employee: me } = useAuth();
+  const { employee: me, can } = useAuth();
   const canManage = isManager(me);
-  const canBuild = isSuperadmin(me);
+  const canBuild = can('forms', 'edit');
   const isSelf = me?.id === id;
   const [form, setForm] = useState<EmployeeRow | null>(null);
   const [err, setErr] = useState(''); const [saved, setSaved] = useState('');
