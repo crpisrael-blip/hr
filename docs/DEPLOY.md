@@ -145,6 +145,29 @@ PUBLIC_APPLY_ENDPOINT=https://jsxkwosjtjdypwedzxwx.supabase.co/functions/v1/appl
 
 ---
 
+## 2.7 ניתוח קורות חיים ב-AI (analyze-cv)
+
+פונקציה מאומתת (JWT) שמנתחת קו״ח דרך Claude ורושמת הצעות ב-`app.document_analyses`.
+הפעלה (חד-פעמית):
+
+1. **מיגרציות** `0029` (הגדרת `ai.model`) ו-`0030` (הרשאת העלאת קו״ח לצוות) —
+   להריץ ב-SQL Editor לפי הסדר.
+2. **סוד** `ANTHROPIC_API_KEY` ב-Edge Functions → Secrets (ראו טבלה בסעיף 3).
+3. **פריסה** (בלי `--no-verify-jwt` — זו נקודה מאומתת):
+   ```bash
+   supabase functions deploy analyze-cv --project-ref jsxkwosjtjdypwedzxwx
+   ```
+4. **הפעלה** בהגדרות → **AI**: מתג הפעלה, בחירת מודל (ברירת מחדל Sonnet 5),
+   מכסה חודשית (0 = ללא הגבלה). הניתוח עצמו מכרטיס המועמד → "ניתוח קורות חיים (AI)".
+
+> העלאת קו״ח מכרטיס המועמד (מיגרציה `0030`) עובדת גם בלי צעדים 2–4 — היא לא
+> תלויה ב-AI. ניתוח AI דורש את כל הארבעה.
+
+> תיקון `apply`: כשל בהעלאת קו״ח מההגשה נרשם כעת כפעילות גלויה על המועמד
+> במקום להיבלע. דורש **פריסה מחדש** של `apply` (ראו סעיף 2).
+
+---
+
 ## 3. סודות פונקציות הקצה
 
 מוגדרים ב-**Supabase Dashboard → Edge Functions → Secrets**. אינם יושבים
@@ -152,9 +175,11 @@ PUBLIC_APPLY_ENDPOINT=https://jsxkwosjtjdypwedzxwx.supabase.co/functions/v1/appl
 
 | סוד | נקרא ב | חובה? | ערך |
 |---|---|---|---|
-| `SERVICE_ROLE_KEY` | `apply`, `invite-employee` | **חובה** | המפתח הסודי `sb_secret_…` של הפרויקט. יש fallback ל-`SUPABASE_SERVICE_ROLE_KEY` שמוזרק אוטומטית, אך עדיף להגדיר מפורשות. |
+| `SERVICE_ROLE_KEY` | `apply`, `invite-employee`, `analyze-cv` | **חובה** | המפתח הסודי `sb_secret_…` של הפרויקט. יש fallback ל-`SUPABASE_SERVICE_ROLE_KEY` שמוזרק אוטומטית, אך עדיף להגדיר מפורשות. |
+| `ANTHROPIC_API_KEY` | `analyze-cv` | חובה **לניתוח AI** | מפתח מ-console.anthropic.com. בלעדיו ניתוח קורות החיים מחזיר `server_misconfigured`. לעולם לא בקוד/בדפדפן. |
 | `APPLY_ALLOW_ORIGIN` | `apply` | רשות (ראו למטה) | דומיין **אחד** נוסף שמורשה לשלוח את טופס ההגשה, כולל הסכמה: `https://example.com`. ריק = רק הדומיינים שבקוד. |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | שתי הפונקציות | — | מוזרקים אוטומטית על ידי Supabase. אין להגדיר ידנית. |
+| `ANALYZE_ALLOW_ORIGIN` | `analyze-cv` | רשות | דומיינים נוספים (מופרד בפסיקים) מעבר ל-`hr-app.ort-tech.co.il`. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | הפונקציות | — | מוזרקים אוטומטית על ידי Supabase. אין להגדיר ידנית. |
 
 ### `APPLY_ALLOW_ORIGIN` — למה הוא קיים
 
