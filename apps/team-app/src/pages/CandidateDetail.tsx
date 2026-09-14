@@ -8,6 +8,7 @@ import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
 import Contact from '../components/Contact';
 import Dialog from '../components/Dialog';
+import SendForm from '../components/SendForm';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsView } from '../components/CustomFields';
 
@@ -112,7 +113,7 @@ export default function CandidateDetail() {
 
       <div className="grid2" style={{ marginTop: 16 }}>
         <Activities candId={id!} meId={meId} rows={activities} onChange={reload} />
-        <Forms rows={forms} />
+        <Forms entityId={id!} recipient={{ name: c.full_name, email: c.email, phone: c.phone_raw }} rows={forms} onSent={reload} />
       </div>
       <style>{`
         .cd-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: start; }
@@ -200,11 +201,16 @@ function Activities({ candId, meId, rows, onChange }:
   );
 }
 
-// טפסים שנשלחו/מולאו למועמד, עם המצב הנוכחי. תצוגה בלבד — מנוהלים במודול הטפסים.
-function Forms({ rows }: { rows: FormInst[] }) {
+// טפסים שנשלחו/מולאו למועמד, עם המצב הנוכחי. הבנייה במודול הטפסים; כאן שולחים
+// בהקשר התיק — הכפתור יוצר מופע מקושר למועמד עם קישור למילוי.
+function Forms({ entityId, recipient, rows, onSent }:
+  { entityId: string; recipient: { name?: string | null; email?: string | null; phone?: string | null }; rows: FormInst[]; onSent: () => void }) {
   return (
     <div className="card" style={{ padding: 20 }}>
-      <h2 className="sec">טפסים ({rows.length})</h2>
+      <div className="spread" style={{ alignItems: 'center', marginBottom: 4 }}>
+        <h2 className="sec" style={{ margin: 0 }}>טפסים ({rows.length})</h2>
+        <SendForm entityKey="candidate" entityId={entityId} recipient={recipient} onSent={onSent} />
+      </div>
       {rows.length === 0 ? <p className="hint">לא נשלחו טפסים למועמד.</p> : (
         <ul className="linklist">
           {rows.map(f => (

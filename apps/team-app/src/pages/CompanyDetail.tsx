@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { COMPANY_STATUS, COMMISSION_BASE, JOB_STAGE, formatDate, label } from '../lib/format';
+import { COMPANY_STATUS, COMMISSION_BASE, JOB_STAGE, FORM_STATUS, formatDate, label } from '../lib/format';
 import { todayLocal } from '../lib/dates';
 import { useAuth, isManager } from '../lib/auth';
 import { useLoad, unwrap } from '../lib/useLoad';
@@ -12,13 +12,15 @@ import Dialog from '../components/Dialog';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsView } from '../components/CustomFields';
 import Contact from '../components/Contact';
+import SendForm from '../components/SendForm';
 
-type Tab = 'contacts' | 'agreements' | 'jobs';
+type Tab = 'contacts' | 'agreements' | 'jobs' | 'forms';
 
 interface Company { id: string; name: string; status: string; custom: Record<string, unknown> | null }
 interface ContactRow { id: string; full_name: string; title: string | null; email: string | null; phone: string | null; is_primary: boolean }
 interface AgreementRow { id: string; version: number; commission_pct: number; commission_base: string; warranty_days: number; installments: number; payment_terms_days: number; valid_from: string; valid_to: string | null }
 interface JobRow { id: string; title: string; stage: string }
+interface FormInst { id: string; status: string; sent_at: string | null; completed_at: string | null; created_at: string; form_templates: { name: string } | null }
 
 export default function CompanyDetail() {
   const { id } = useParams();
@@ -27,22 +29,26 @@ export default function CompanyDetail() {
   const { data, err, loading, reload } = useLoad(async () => {
     const company = unwrap(await supabase.from('companies').select('*').eq('id', id).maybeSingle()) as Company | null;
     if (!company) throw { code: 'PGRST116', message: 'company not found' };
-    const [ct, ag, jb] = await Promise.all([
+    const [ct, ag, jb, fr] = await Promise.all([
       supabase.from('contacts').select('id, full_name, title, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
       supabase.from('agreements').select('*').eq('company_id', id).order('version', { ascending: false }),
       supabase.from('jobs').select('id, title, stage').eq('company_id', id).order('created_at', { ascending: false }),
+      supabase.from('form_instances').select('id, status, sent_at, completed_at, created_at, form_templates(name)').eq('entity_type', 'company').eq('entity_id', id).order('created_at', { ascending: false }),
     ]);
     return {
       company,
       contacts: unwrap(ct) as ContactRow[],
       agreements: unwrap(ag) as AgreementRow[],
       jobs: unwrap(jb) as JobRow[],
+      forms: unwrap(fr) as unknown as FormInst[],
     };
   }, [id]);
 
   if (loading) return <Loading />;
   if (err || !data) return <Msg kind="err">{err || 'החברה לא נמצאה.'}</Msg>;
-  const { company, contacts, agreements, jobs } = data;
+  const { company, contacts, agreements, jobs, forms } = data;
+  const primary = contacts.find(c => c.is_primary) ?? contacts[0];
+  const formRecipient = { name: primary?.full_name ?? company.name, email: primary?.email, phone: primary?.phone };
 
   return (
     <>
@@ -52,6 +58,7 @@ export default function CompanyDetail() {
         { key: 'contacts', label: `אנשי קשר (${contacts.length})` },
         { key: 'agreements', label: `הסכמים (${agreements.length})` },
         { key: 'jobs', label: `משרות (${jobs.length})` },
+        { key: 'forms', label: `טפסים (${forms.length})` },
       ]} />
 
       {tab === 'contacts' && <TabPanel group="company" tabKey="contacts"><ContactsTab companyId={id!} rows={contacts} onChange={reload} /></TabPanel>}
@@ -63,6 +70,34 @@ export default function CompanyDetail() {
               <table><thead><tr><th>תפקיד</th><th>שלב</th></tr></thead><tbody>
                 {jobs.map(j => <tr key={j.id}><td style={{ fontWeight: 600 }}><Link to={`/jobs/${j.id}`}>{j.title}</Link></td><td><span className="tag mute">{label(JOB_STAGE, j.stage)}</span></td></tr>)}
               </tbody></table>
+            )}
+          </div>
+        </TabPanel>
+      )}
+      {tab === 'forms' && (
+        <TabPanel group="company" tabKey="forms">
+          <div className="card" style={{ padding: 20 }}>
+            <div className="spread" style={{ alignItems: 'center', marginBottom: 8 }}>
+              <h2 className="sec" style={{ margin: 0 }}>טפסים ({forms.length})</h2>
+              <SendForm entityKey="company" entityId={id!} recipient={formRecipient} onSent={reload} />
+            </div>
+            {forms.length === 0 ? <p className="hint">לא נשלחו טפסים ללקוח.</p> : (
+              <ul className="linklist">
+                {forms.map(f => (
+                  <li key={f.id}>
+                    <Link to={`/forms/instances/${f.id}`}>
+                      <span>{f.form_templates?.name ?? 'טופס'}
+                        <span className="hint" style={{ display: 'block' }}>
+                          {f.status === 'completed' && f.completed_at ? 'הושלם ' + formatDate(f.completed_at)
+                            : f.sent_at ? 'נשלח ' + formatDate(f.sent_at)
+                            : 'נוצר ' + formatDate(f.created_at)}
+                        </span>
+                      </span>
+                      <span className={'tag ' + (f.status === 'completed' ? 'ok' : 'brand')}>{label(FORM_STATUS, f.status)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </TabPanel>
