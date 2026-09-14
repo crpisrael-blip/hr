@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ACTIVITY_KIND, APP_STAGE, CANDIDATE_DOC_KIND, FORM_STATUS, formatDate, formatDateTime, fmtSize, label, money } from '../lib/format';
+import { ACTIVITY_KIND, APP_STAGE, CANDIDATE_DOC_KIND, formatDate, formatDateTime, fmtSize, label, money } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { useLoad, unwrap } from '../lib/useLoad';
 import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
 import Contact from '../components/Contact';
 import Dialog from '../components/Dialog';
-import SendForm from '../components/SendForm';
+import FormsPanel from '../components/FormsPanel';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsView } from '../components/CustomFields';
 
@@ -113,7 +113,7 @@ export default function CandidateDetail() {
 
       <div className="grid2" style={{ marginTop: 16 }}>
         <Activities candId={id!} meId={meId} rows={activities} onChange={reload} />
-        <Forms entityId={id!} recipient={{ name: c.full_name, email: c.email, phone: c.phone_raw }} rows={forms} onSent={reload} />
+        <FormsPanel entityKey="candidate" entityId={id!} recipient={{ name: c.full_name, email: c.email, phone: c.phone_raw }} rows={forms} onSent={reload} emptyText="לא נשלחו טפסים למועמד." />
       </div>
       <style>{`
         .cd-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: start; }
@@ -201,34 +201,3 @@ function Activities({ candId, meId, rows, onChange }:
   );
 }
 
-// טפסים שנשלחו/מולאו למועמד, עם המצב הנוכחי. הבנייה במודול הטפסים; כאן שולחים
-// בהקשר התיק — הכפתור יוצר מופע מקושר למועמד עם קישור למילוי.
-function Forms({ entityId, recipient, rows, onSent }:
-  { entityId: string; recipient: { name?: string | null; email?: string | null; phone?: string | null }; rows: FormInst[]; onSent: () => void }) {
-  return (
-    <div className="card" style={{ padding: 20 }}>
-      <div className="spread" style={{ alignItems: 'center', marginBottom: 4 }}>
-        <h2 className="sec" style={{ margin: 0 }}>טפסים ({rows.length})</h2>
-        <SendForm entityKey="candidate" entityId={entityId} recipient={recipient} onSent={onSent} />
-      </div>
-      {rows.length === 0 ? <p className="hint">לא נשלחו טפסים למועמד.</p> : (
-        <ul className="linklist">
-          {rows.map(f => (
-            <li key={f.id}>
-              <Link to={`/forms/instances/${f.id}`}>
-                <span>{f.form_templates?.name ?? 'טופס'}
-                  <span className="hint" style={{ display: 'block' }}>
-                    {f.status === 'completed' && f.completed_at ? 'הושלם ' + formatDate(f.completed_at)
-                      : f.sent_at ? 'נשלח ' + formatDate(f.sent_at)
-                      : 'נוצר ' + formatDate(f.created_at)}
-                  </span>
-                </span>
-                <span className={'tag ' + (f.status === 'completed' ? 'ok' : 'brand')}>{label(FORM_STATUS, f.status)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}

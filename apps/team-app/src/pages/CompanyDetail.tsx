@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { COMPANY_STATUS, COMMISSION_BASE, JOB_STAGE, FORM_STATUS, formatDate, label } from '../lib/format';
+import { COMPANY_STATUS, COMMISSION_BASE, JOB_STAGE, formatDate, label } from '../lib/format';
 import { todayLocal } from '../lib/dates';
 import { useAuth, isManager } from '../lib/auth';
 import { useLoad, unwrap } from '../lib/useLoad';
@@ -12,7 +12,7 @@ import Dialog from '../components/Dialog';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsView } from '../components/CustomFields';
 import Contact from '../components/Contact';
-import SendForm from '../components/SendForm';
+import FormsPanel from '../components/FormsPanel';
 
 type Tab = 'contacts' | 'agreements' | 'jobs' | 'forms';
 
@@ -76,30 +76,7 @@ export default function CompanyDetail() {
       )}
       {tab === 'forms' && (
         <TabPanel group="company" tabKey="forms">
-          <div className="card" style={{ padding: 20 }}>
-            <div className="spread" style={{ alignItems: 'center', marginBottom: 8 }}>
-              <h2 className="sec" style={{ margin: 0 }}>טפסים ({forms.length})</h2>
-              <SendForm entityKey="company" entityId={id!} recipient={formRecipient} onSent={reload} />
-            </div>
-            {forms.length === 0 ? <p className="hint">לא נשלחו טפסים ללקוח.</p> : (
-              <ul className="linklist">
-                {forms.map(f => (
-                  <li key={f.id}>
-                    <Link to={`/forms/instances/${f.id}`}>
-                      <span>{f.form_templates?.name ?? 'טופס'}
-                        <span className="hint" style={{ display: 'block' }}>
-                          {f.status === 'completed' && f.completed_at ? 'הושלם ' + formatDate(f.completed_at)
-                            : f.sent_at ? 'נשלח ' + formatDate(f.sent_at)
-                            : 'נוצר ' + formatDate(f.created_at)}
-                        </span>
-                      </span>
-                      <span className={'tag ' + (f.status === 'completed' ? 'ok' : 'brand')}>{label(FORM_STATUS, f.status)}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <FormsPanel entityKey="company" entityId={id!} recipient={formRecipient} rows={forms} onSent={reload} emptyText="לא נשלחו טפסים ללקוח." />
         </TabPanel>
       )}
       <style>{`.addrow { display: grid; gap: 10px; padding: 16px; border-bottom: 1px solid var(--line); }`}</style>

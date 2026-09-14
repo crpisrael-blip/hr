@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { PLACEMENT_STATUS, INVOICE_STATUS, COMMISSION_BASE, money, formatDate } from '../lib/format';
 import PageHead from '../components/PageHead';
 import { CustomFieldsCard } from '../components/CustomFields';
+import FormsPanel, { type FormInst } from '../components/FormsPanel';
 
 export default function PlacementDetail() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function PlacementDetail() {
   const [p, setP] = useState<any>(null);
   const [recruiterName, setRecruiterName] = useState<string>('—');
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [forms, setForms] = useState<FormInst[]>([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const isMgr = employee?.role === 'manager' || employee?.role === 'superadmin';
 
@@ -30,6 +32,8 @@ export default function PlacementDetail() {
       const inv = await fin.from('invoices').select('*').eq('schedule_id', sched.data.id).order('seq');
       if (!inv.error) setInvoices(inv.data);
     } else setInvoices([]);
+    const fr = await supabase.from('form_instances').select('id, status, sent_at, completed_at, created_at, form_templates(name)').eq('entity_type', 'placement').eq('entity_id', id).order('created_at', { ascending: false });
+    if (!fr.error) setForms(fr.data as unknown as FormInst[]);
   }
   useEffect(() => { load(); }, [id]);
 
@@ -99,6 +103,11 @@ export default function PlacementDetail() {
         </div>
       </div>
 
+      <div style={{ marginTop: 16 }}>
+        <FormsPanel entityKey="placement" entityId={id!} recipientKind="candidate"
+          recipient={{ name: p.candidateName }} rows={forms} onSent={load}
+          emptyText="לא נשלחו טפסים במסגרת ההשמה." />
+      </div>
       <div style={{ marginTop: 16 }}>
         <CustomFieldsCard entityType="placement" initial={p.custom}
           onSave={async v => ({ error: (await fin.rpc('set_placement_custom', { p_id: id, p_custom: v })).error })} />

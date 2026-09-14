@@ -8,13 +8,14 @@ import { useLoad, unwrap } from '../lib/useLoad';
 import { rpcErrorMessage, toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
 import Dialog from '../components/Dialog';
+import FormsPanel, { type FormInst } from '../components/FormsPanel';
 import { Msg, Loading } from '../components/Msg';
 import { CustomFieldsEdit, useCustomFields } from '../components/CustomFields';
 
 interface Application {
   id: string; stage: string; stage_changed_at: string; source: string | null; close_reason: string | null;
   candidate_id: string; job_id: string; recruiter_id: string | null; custom: Record<string, unknown> | null;
-  candidates: { full_name: string } | null;
+  candidates: { full_name: string; email: string | null; phone_raw: string | null } | null;
   jobs: { title: string; company_id: string; companies: { name: string } | null } | null;
 }
 interface HistRow { id: number; from_stage: string | null; to_stage: string; reason: string | null; changed_at: string }
@@ -53,11 +54,11 @@ export default function ApplicationDetail() {
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const appl = unwrap(await supabase.from('applications')
-      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, recruiter_id, custom, candidates(full_name), jobs(title, company_id, companies(name))')
+      .select('id, stage, stage_changed_at, source, close_reason, candidate_id, job_id, recruiter_id, custom, candidates(full_name, email, phone_raw), jobs(title, company_id, companies(name))')
       .eq('id', id).maybeSingle()) as unknown as Application | null;
     if (!appl) throw { code: 'PGRST116', message: 'application not found' };
     const companyId = appl.jobs?.company_id;
-    const [h, iv, sb, ct] = await Promise.all([
+    const [h, iv, sb, ct, fr] = await Promise.all([
       supabase.from('application_stage_history').select('id, from_stage, to_stage, reason, changed_at').eq('application_id', id).order('changed_at', { ascending: false }),
       supabase.from('interviews').select('id, scheduled_at, location, status').eq('application_id', id).order('scheduled_at', { ascending: false }),
       supabase.from('client_submissions').select('id, sent_at, sent_manually, contact_id, summary_sent, contacts(full_name)').eq('application_id', id).order('sent_at', { ascending: false }),
@@ -65,6 +66,7 @@ export default function ApplicationDetail() {
       companyId
         ? supabase.from('contacts').select('id, full_name').eq('company_id', companyId)
         : Promise.resolve({ data: [] as ContactOpt[], error: null }),
+      supabase.from('form_instances').select('id, status, sent_at, completed_at, created_at, form_templates(name)').eq('entity_type', 'application').eq('entity_id', id).order('created_at', { ascending: false }),
     ]);
     return {
       appl,
@@ -72,6 +74,7 @@ export default function ApplicationDetail() {
       interviews: unwrap(iv) as Interview[],
       subs: unwrap(sb) as unknown as Submission[],
       contacts: unwrap(ct) as ContactOpt[],
+      forms: unwrap(fr) as unknown as FormInst[],
     };
   }, [id]);
 
@@ -97,7 +100,7 @@ export default function ApplicationDetail() {
   if (loading) return <Loading />;
   if (loadErr || !data) return <Msg kind="err">{loadErr || 'המועמדות לא נמצאה.'}</Msg>;
 
-  const { appl: a, hist, interviews, subs, contacts } = data;
+  const { appl: a, hist, interviews, subs, contacts, forms } = data;
   const transitions = allowedTransitions(a.stage);
 
   return (
@@ -140,6 +143,9 @@ export default function ApplicationDetail() {
           <AppCustom key={a.id} appId={a.id} initial={a.custom ?? {}} onSaved={reload} />
           <Interviews appId={a.id} meId={meId} rows={interviews} onChange={reload} />
           <Submissions appId={a.id} meId={meId} rows={subs} contacts={contacts} onChange={reload} />
+          <FormsPanel entityKey="application" entityId={a.id} recipientKind="candidate"
+            recipient={{ name: a.candidates?.full_name, email: a.candidates?.email, phone: a.candidates?.phone_raw }}
+            rows={forms} onSent={reload} emptyText="לא נשלחו טפסים במסגרת המועמדות." />
         </div>
 
         <div className="card" style={{ padding: 20 }}>
