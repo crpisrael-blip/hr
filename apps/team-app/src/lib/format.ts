@@ -130,6 +130,9 @@ export const TASK_COMPLETION: Record<string, string> = {
 export const FORM_STATUS: Record<string, string> = {
   created: 'נוצר', sent: 'נשלח', opened: 'נפתח', started: 'במילוי', completed: 'הושלם',
 };
+export const AI_STATUS: Record<string, string> = {
+  queued: 'בתור', processing: 'בעיבוד', done: 'הושלם', needs_review: 'לבדיקה', failed: 'נכשל',
+};
 export const ACTIVITY_KIND: Record<string, string> = {
   call: 'שיחת טלפון', meeting: 'פגישה', message: 'הודעה', note: 'הערה',
 };

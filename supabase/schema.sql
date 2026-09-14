@@ -1,4 +1,4 @@
--- HR schema (0001..0028 merged for Supabase SQL Editor)
+-- HR schema (0001..0029 merged for Supabase SQL Editor)
 
 -- === 0001_foundation.sql ===
 -- 0001 · יסודות: סכמות, טיפוסים, משתמשים, הרשאות, הגדרות ויומן ביקורת
@@ -4267,3 +4267,23 @@ create policy form_layouts_update on app.form_layouts for update to authenticate
 drop policy if exists form_layouts_delete on app.form_layouts;
 create policy form_layouts_delete on app.form_layouts for delete to authenticated
   using ((select app.effective_scope('forms','delete')) <> 'none');
+
+-- === 0029_cv_ai_analysis.sql ===
+-- 0029 · הפעלת ניתוח קורות חיים ב-AI (Claude)
+-- התשתית קיימת מ-0003: app.document_analyses (הצעות עד לאישור אדם) ו-app.ai_status.
+-- כאן רק מוסיפים הגדרת מודל שניתנת לעריכה מהמערכת, ומרעננים תיאורים.
+-- ההפעלה בפועל: הדבקת ANTHROPIC_API_KEY בסודות ה-Edge Function, פריסת הפונקציה
+-- analyze-cv, והפעלת המתג ai.enabled מתוך הגדרות → AI. המפתח לעולם אינו בקוד/בדפדפן.
+
+-- ai.model — המודל שבו analyze-cv משתמשת. ברירת מחדל: Sonnet 5 (איזון דיוק/עלות).
+insert into app.settings (key, value, description) values
+  ('ai.model', '"claude-sonnet-5"', 'מודל ה-AI לניתוח קורות חיים')
+on conflict (key) do nothing;
+
+-- ריענון תיאורים לבהירות בממשק ההגדרות.
+update app.settings
+   set description = 'ניתוח קורות חיים ב-AI פעיל/כבוי'
+ where key = 'ai.enabled';
+update app.settings
+   set description = 'מכסת ניתוחים חודשית (0 = ללא הגבלה)'
+ where key = 'ai.monthly_quota';
