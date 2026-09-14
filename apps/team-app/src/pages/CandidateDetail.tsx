@@ -119,7 +119,7 @@ export default function CandidateDetail() {
           candidate={{ full_name: c.full_name, email: c.email, phone_raw: c.phone_raw,
             years_experience: c.years_experience, skills: c.skills,
             desired_salary: c.desired_salary, availability: c.availability }}
-          onApplied={reload} />
+          onChange={reload} />
       </div>
 
       <div className="grid2" style={{ marginTop: 16 }}>

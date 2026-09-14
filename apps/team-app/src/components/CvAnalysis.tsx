@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AI_STATUS, formatDateTime, label, money } from '../lib/format';
+import { AI_STATUS, formatDateTime, label, money, safeFileName } from '../lib/format';
+import { MAX_UPLOAD_MB } from '../lib/config';
 import { toUserMessage } from '../lib/errors';
 import { Msg } from './Msg';
+
+// ה-AI תומך ב-PDF ו-DOCX בלבד — מגבילים את ההעלאה בהתאם.
+const CV_ACCEPT = '.pdf,.docx';
+const CV_MIME = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 // ניתוח קורות חיים ב-AI. מפעיל את פונקציית השרת analyze-cv, מציג את התוצאה
 // כ"הצעות" ומאפשר למגייס להחיל שדות נבחרים על כרטיס המועמד — לעולם לא דורס
@@ -43,14 +51,16 @@ const isEmpty = (v: unknown) =>
   v == null || v === '' || (Array.isArray(v) && v.length === 0);
 
 export default function CvAnalysis(
-  { candidateId, candidate, docs, onApplied }:
-  { candidateId: string; candidate: CandidateNow; docs: CvDoc[]; onApplied: () => void },
+  { candidateId, candidate, docs, onChange }:
+  { candidateId: string; candidate: CandidateNow; docs: CvDoc[]; onChange: () => void },
 ) {
   const cvDocs = useMemo(() => docs.filter(d => d.kind === 'cv'), [docs]);
   const [rows, setRows] = useState<Analysis[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [busyDoc, setBusyDoc] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [sel, setSel] = useState<Record<string, boolean>>({});
@@ -124,7 +134,31 @@ export default function CvAnalysis(
     setApplyBusy(false);
     if (error) { setErr(toUserMessage(error, 'החלת השדות נכשלה.')); return; }
     setMsg(`עודכנו ${chosen.length} שדות בכרטיס.`);
-    onApplied();
+    onChange();
+  }
+
+  // העלאת קו״ח ידנית על ידי המגייס (PDF/DOCX). שימושי כשההגשה הציבורית נכשלה,
+  // או כדי לצרף קו״ח למועמד שהוקם ידנית. אחרי ההעלאה אפשר לנתח מיד ב-AI.
+  async function upload(file: File) {
+    setErr(''); setMsg('');
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) { setErr(`הקובץ גדול מדי. המקסימום הוא ${MAX_UPLOAD_MB} מ״ב.`); return; }
+    if (file.type && !CV_MIME.includes(file.type)) { setErr('אפשר להעלות PDF או Word (docx) בלבד.'); return; }
+    setUploading(true);
+    const path = `${candidateId}/cv/${Date.now()}-${safeFileName(file.name)}`;
+    const up = await supabase.storage.from('candidate-docs').upload(path, file, { contentType: file.type || 'application/octet-stream' });
+    if (up.error) { setUploading(false); setErr(toUserMessage(up.error, 'העלאת הקובץ נכשלה.')); return; }
+    const ins = await supabase.from('documents').insert({
+      candidate_id: candidateId, kind: 'cv', storage_path: path,
+      file_name: file.name, mime_type: file.type || 'application/octet-stream', size_bytes: file.size,
+    });
+    setUploading(false);
+    if (ins.error) {
+      await supabase.storage.from('candidate-docs').remove([path]); // ניקוי קובץ יתום
+      setErr(toUserMessage(ins.error, 'רישום המסמך נכשל. הקובץ לא נשמר.'));
+      return;
+    }
+    setMsg('קורות החיים הועלו.');
+    onChange();
   }
 
   const latestByDoc = new Map<string, Analysis>();
@@ -132,7 +166,16 @@ export default function CvAnalysis(
 
   return (
     <div className="card" style={{ padding: 20 }}>
-      <h2 className="sec">ניתוח קורות חיים (AI)</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 className="sec" style={{ margin: 0 }}>ניתוח קורות חיים (AI)</h2>
+        <button type="button" className="btn btn-quiet btn-sm" disabled={uploading}
+          onClick={() => fileRef.current?.click()}>
+          {uploading ? 'מעלה…' : '+ העלאת קו״ח'}
+        </button>
+        <input ref={fileRef} type="file" className="sr-only" accept={CV_ACCEPT} tabIndex={-1}
+          aria-hidden="true" disabled={uploading}
+          onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
+      </div>
       <Msg kind="err">{err}</Msg>
       <Msg kind="ok">{msg}</Msg>
 
