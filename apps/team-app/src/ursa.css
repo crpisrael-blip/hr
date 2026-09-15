@@ -160,9 +160,10 @@ input[type=email],input[type=tel] { direction:ltr; text-align:start; }
   .nav-item { min-height:42px; flex-shrink:0; gap:8px; padding:8px 12px; flex-direction:row; font-size:14px; }
   .nav-item svg { width:20px; height:20px; }
   .promo { display:none; } .user-chip { position:absolute; left:16px; top:12px; width:auto; padding:0; } .user-chip .who { display:none; } .user-chip .ava { width:36px; height:36px; }
-  .home-shell .topbar { display:flex; position:relative; width:100%; background:#eaf6fc; }
-  .topbar { height:64px; padding:12px 16px; gap:14px; }
-  .search { max-width:none; } .topbar .ava { width:36px; height:36px; }
+  /* בנייד זהות המשתמש כבר מוצגת ב-user-chip הנעוץ (לחיץ, פותח תפריט חשבון);
+     ה-topbar שכפל אותה — מוסתר כדי למנוע אווטר כפול. */
+  .topbar { display:none; }
+  .search { max-width:none; }
   .hero { padding:28px 20px; min-height:250px; background-position:64% center; }
   .hero::before { content:''; position:absolute; inset:0; background:linear-gradient(90deg,#ecf9fff5 10%,#ecf9ffe6 40%,#ecf9ff22); }
   .hero-in { width:68%; } .hero h1 { white-space:normal; font-size:31px; } .hero-subtitle { font-size:18px; } .hero .lede { font-size:14px; } .hero-cta { gap:12px; } .hero .btn { font-size:14px; padding:9px 14px; } .hero-words { display:none; }
