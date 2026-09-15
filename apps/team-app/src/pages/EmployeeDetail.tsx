@@ -33,6 +33,18 @@ const INVITE_ERR: Record<string, string> = {
   missing_employee: 'חסר מזהה עובד.', server_misconfigured: 'הפונקציה חסרה מפתח שירות.',
 };
 
+const DELETE_ERR: Record<string, string> = {
+  forbidden: 'אין לך הרשאה למחוק משתמשים. ההרשאה שמורה למנהל על, וניתן לשנותה במסך ההרשאות.',
+  forbidden_superadmin: 'רק מנהל על יכול למחוק מנהל על.',
+  cannot_delete_self: 'אי אפשר למחוק את המשתמש שלך.',
+  not_found: 'העובד לא נמצא.', missing_employee: 'חסר מזהה עובד.',
+  server_misconfigured: 'הפונקציה חסרה מפתח שירות.',
+  permission_check_failed: 'בדיקת ההרשאה נכשלה, נסו שוב.',
+  auth_delete_failed: 'מחיקת חשבון ההתחברות נכשלה.',
+  card_delete_failed: 'מחיקת כרטיס העובד נכשלה.',
+  card_update_failed: 'עדכון כרטיס העובד נכשל.',
+};
+
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -48,6 +60,9 @@ export default function EmployeeDetail() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
+  const [delMsg, setDelMsg] = useState('');
+  // האם המשתמש הנוכחי רשאי למחוק משתמשים לגמרי (מנהל על כברירת מחדל / מטריצת ההרשאות).
+  const [canDeleteUsers, setCanDeleteUsers] = useState(false);
   const [custom, setCustom] = useState<CustomField[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -62,6 +77,9 @@ export default function EmployeeDetail() {
     setSlots((lay.data?.slots as Slot[]) ?? []);
   }
   useEffect(() => { reloadMeta(); }, []);
+  useEffect(() => {
+    supabase.rpc('can_delete_users').then(({ data }) => setCanDeleteUsers(data === true));
+  }, []);
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const emp = unwrap(await supabase.from('employees')
@@ -125,19 +143,27 @@ export default function EmployeeDetail() {
     reload();
   }
 
-  // מחיקה אמיתית. מפתחות זרים רבים הם restrict — מגייס עם השמות/משימות/רשומות
-  // שיצר לא יימחק, וזה נכון: שגיאת 23503 מתורגמת להמלצה על הקפאה.
+  // מחיקה מלאה: מסירה את חשבון ההתחברות (auth.users) ואת כרטיס העובד דרך
+  // פונקציית הקצה delete-employee. אם לעובד יש רשומות עסקיות מקושרות (FK) —
+  // ההיסטוריה נשמרת: הכניסה מוסרת והכרטיס מסומן 'הסתיים' (mode='ended').
   async function removeEmployee() {
-    setErr(''); setDelBusy(true);
-    const { error } = await supabase.from('employees').delete().eq('id', id);
+    setErr(''); setDelMsg(''); setDelBusy(true);
+    const { data, error } = await supabase.functions.invoke('delete-employee', { body: { employee_id: id } });
     setDelBusy(false); setConfirmDel(false);
     if (error) {
-      const code = (error as { code?: string }).code;
-      if (code === '23503') {
-        setErr('לא ניתן למחוק: למגייס יש רשומות מקושרות (השמות, משימות, מועמדים או פעולות שביצע). השתמשו ב"הקפאה" במקום — היא חוסמת כניסה בלי לפגוע בהיסטוריה.');
-        return;
-      }
-      setErr(toUserMessage(error, 'מחיקת העובד נכשלה.'));
+      let code = '';
+      try {
+        const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+        code = (await ctx?.json?.())?.error ?? '';
+      } catch { /* גוף התשובה אינו JSON */ }
+      console.error('[hr] delete-employee failed:', error);
+      setErr(DELETE_ERR[code] || 'מחיקת המשתמש נכשלה.');
+      return;
+    }
+    if ((data as { mode?: string })?.mode === 'ended') {
+      // ההיסטוריה נשמרה — הכרטיס נשאר במערכת כ"הסתיים".
+      setDelMsg('חשבון ההתחברות הוסר. לעובד יש רשומות עסקיות מקושרות, ולכן הכרטיס נשמר בהיסטוריה וסומן כ"הסתיים".');
+      reload();
       return;
     }
     navigate('/employees');
@@ -194,7 +220,7 @@ export default function EmployeeDetail() {
         </div>
       </div>
 
-      {canManage && (
+      {(canManage || canDeleteUsers) && (
         <div className="card danger-zone" style={{ padding: 20, marginTop: 16 }}>
           <h2 className="sec">פעולות ניהול</h2>
           {isSelf ? (
@@ -202,35 +228,45 @@ export default function EmployeeDetail() {
           ) : (
             <>
               <div className="dz-actions">
-                <div>
-                  <button type="button" className="btn btn-quiet btn-sm" disabled={statusBusy} onClick={toggleFreeze}>
-                    {statusBusy ? 'מעדכן…' : form.employment_status === 'suspended' ? 'הפעלה מחדש' : 'הקפאת מגייס'}
-                  </button>
-                  <p className="hint" style={{ marginTop: 6 }}>
-                    {form.employment_status === 'suspended'
-                      ? 'המגייס מוקפא כרגע — הכניסה למערכת חסומה.'
-                      : 'הקפאה חוסמת את הכניסה למערכת ושומרת את ההיסטוריה. הפיך.'}
-                  </p>
-                </div>
-                <div>
-                  <button type="button" className="btn btn-danger btn-sm" disabled={delBusy} onClick={() => setConfirmDel(true)}>
-                    מחיקת מגייס
-                  </button>
-                  <p className="hint" style={{ marginTop: 6 }}>מחיקה לצמיתות. אפשרית רק כשאין למגייס רשומות מקושרות.</p>
-                </div>
+                {canManage && (
+                  <div>
+                    <button type="button" className="btn btn-quiet btn-sm" disabled={statusBusy} onClick={toggleFreeze}>
+                      {statusBusy ? 'מעדכן…' : form.employment_status === 'suspended' ? 'הפעלה מחדש' : 'הקפאת מגייס'}
+                    </button>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      {form.employment_status === 'suspended'
+                        ? 'המגייס מוקפא כרגע — הכניסה למערכת חסומה.'
+                        : 'הקפאה חוסמת את הכניסה למערכת ושומרת את ההיסטוריה. הפיך.'}
+                    </p>
+                  </div>
+                )}
+                {canDeleteUsers && (
+                  <div>
+                    <button type="button" className="btn btn-danger btn-sm" disabled={delBusy} onClick={() => { setDelMsg(''); setConfirmDel(true); }}>
+                      מחיקה מלאה של המשתמש
+                    </button>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      מסירה את חשבון ההתחברות ואת כרטיס העובד. אם יש רשומות עסקיות מקושרות —
+                      ההיסטוריה נשמרת והכרטיס מסומן "הסתיים". הרשאה למנהל על בלבד (ניתן לשינוי במסך ההרשאות).
+                    </p>
+                  </div>
+                )}
               </div>
+              <Msg kind="ok" style={{ marginTop: 12 }}>{delMsg}</Msg>
             </>
           )}
         </div>
       )}
 
-      <Dialog open={confirmDel} title="מחיקת מגייס" onClose={() => setConfirmDel(false)}
+      <Dialog open={confirmDel} title="מחיקה מלאה של המשתמש" onClose={() => setConfirmDel(false)}
         description={emp.full_name}
         footer={<>
-          <button className="btn btn-danger" disabled={delBusy} onClick={removeEmployee}>{delBusy ? 'מוחק…' : 'מחיקה לצמיתות'}</button>
+          <button className="btn btn-danger" disabled={delBusy} onClick={removeEmployee}>{delBusy ? 'מוחק…' : 'מחיקה מלאה'}</button>
           <button className="btn btn-quiet" onClick={() => setConfirmDel(false)}>ביטול</button>
         </>}>
-        <p>הפעולה בלתי הפיכה. אם למגייס יש השמות, משימות או רשומות שיצר — המחיקה תיחסם ותוצע הקפאה במקום.</p>
+        <p>הפעולה בלתי הפיכה. חשבון ההתחברות יימחק והמשתמש לא יוכל להיכנס יותר.
+          אם יש לו רשומות עסקיות מקושרות (השמות, חיובים, משימות) — ההיסטוריה תישמר
+          והכרטיס יסומן כ"הסתיים" במקום להימחק.</p>
       </Dialog>
 
       {canBuild && (
