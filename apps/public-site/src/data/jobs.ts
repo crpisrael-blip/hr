@@ -3,12 +3,18 @@ import fixtures from './fixtures/jobs.json';
 export type EmploymentScope =
   | 'full_time' | 'part_time' | 'temporary' | 'contract' | 'student';
 
+export type JobField =
+  | 'software' | 'engineering' | 'finance' | 'sales_marketing' | 'customer_service'
+  | 'industry' | 'construction' | 'logistics' | 'healthcare' | 'education'
+  | 'hr_admin' | 'management' | 'other';
+
 export interface Job {
   slug: string;
   title: string;
   body: string;
   location: string | null;
   employment_scope: EmploymentScope | null;
+  field: JobField | null;
   company_name: string | null;
   published_at: string;
 }
@@ -19,6 +25,23 @@ export const SCOPE_LABEL: Record<EmploymentScope, string> = {
   temporary: 'זמני',
   contract: 'חוזה',
   student: 'משרת סטודנט',
+};
+
+/** תווית תחום המשרה. מקביל ל-enum app.job_field ולמפה שבמערכת הצוות. */
+export const FIELD_LABEL: Record<JobField, string> = {
+  software: 'הייטק ותוכנה',
+  engineering: 'הנדסה',
+  finance: 'כספים וכלכלה',
+  sales_marketing: 'מכירות ושיווק',
+  customer_service: 'שירות ותמיכה',
+  industry: 'ייצור ותעשייה',
+  construction: 'בינוי ותשתיות',
+  logistics: 'לוגיסטיקה ותפעול',
+  healthcare: 'בריאות ורפואה',
+  education: 'חינוך והדרכה',
+  hr_admin: 'משאבי אנוש ואדמיניסטרציה',
+  management: 'ניהול',
+  other: 'אחר',
 };
 
 /** ערכי schema.org/JobPosting תקניים. לא כל ערך פנימי הוא ערך schema. */
@@ -102,7 +125,7 @@ async function fetchJobs(): Promise<Job[]> {
   const sql = postgres(url, { max: 1, idle_timeout: 5, prepare: false, ssl: dbSsl() });
   try {
     const rows = await sql<Job[]>`
-      select slug, title, body, location, employment_scope, company_name, published_at
+      select slug, title, body, location, employment_scope, field, company_name, published_at
       from app.published_jobs`;
     console.log(`[jobs] נצרבו ${rows.length} משרות מהמסד`);
     // postgres.js מחזיר timestamptz כאובייקט Date. הטיפוס (ומשרות הדמה) הם
@@ -160,4 +183,10 @@ export function excerpt(body: string, max = 155): string {
 export function locationsOf(jobs: Job[]): string[] {
   return [...new Set(jobs.map(j => j.location).filter((l): l is string => !!l))]
     .sort((a, b) => a.localeCompare(b, 'he'));
+}
+
+/** תחומים ייחודיים (מפתחות) שיש להם משרות, בסדר הקטלוג — לדרופדאון ולשבבים. */
+export function fieldsOf(jobs: Job[]): JobField[] {
+  const present = new Set(jobs.map(j => j.field).filter((f): f is JobField => !!f));
+  return (Object.keys(FIELD_LABEL) as JobField[]).filter(f => present.has(f));
 }

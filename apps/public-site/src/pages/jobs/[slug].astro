@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import {
-  loadJobs, type Job, SCOPE_LABEL, SCOPE_SCHEMA, formatDate, isoDate,
+  loadJobs, type Job, SCOPE_LABEL, SCOPE_SCHEMA, FIELD_LABEL, formatDate, isoDate,
   excerpt, validThrough, isRemoteLocation,
 } from '../../data/jobs';
 import { SITE } from '../../data/site';
@@ -13,6 +13,7 @@ export async function getStaticPaths() {
 interface Props { job: Job; }
 const { job } = Astro.props;
 const scope = job.employment_scope ? SCOPE_LABEL[job.employment_scope] : null;
+const fieldLabel = job.field ? FIELD_LABEL[job.field] : null;
 
 // גוף המשרה נשמר כטקסט עם שורות ותבליטים. הופכים לפסקאות ורשימות.
 const blocks = job.body.split(/\n{2,}/).map(chunk => {
@@ -58,6 +59,7 @@ const jobPosting = {
   validThrough: validThrough(job.published_at),
   directApply: true,
   ...(job.employment_scope ? { employmentType: SCOPE_SCHEMA[job.employment_scope] } : {}),
+  ...(fieldLabel ? { occupationalCategory: fieldLabel } : {}),
   hiringOrganization: {
     '@type': 'Organization',
     name: job.company_name ?? SITE.shortName,
@@ -92,6 +94,12 @@ const breadcrumbs = {
       <header>
         <h1>{job.title}</h1>
         <ul class="meta">
+          {fieldLabel && (
+            <li>
+              <span aria-hidden="true">🏷️</span>
+              <span class="visually-hidden">תחום:</span> {fieldLabel}
+            </li>
+          )}
           {job.location && (
             <li>
               <span aria-hidden="true">📍</span>

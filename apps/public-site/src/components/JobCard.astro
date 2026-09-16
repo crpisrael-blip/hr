@@ -1,5 +1,5 @@
 ---
-import { type Job, SCOPE_LABEL, isFresh, formatDate, isoDate, excerpt } from '../data/jobs';
+import { type Job, SCOPE_LABEL, FIELD_LABEL, isFresh, formatDate, isoDate, excerpt } from '../data/jobs';
 interface Props {
   job: Job;
   /** רמת הכותרת בתוך היררכיית העמוד. ב-/jobs הכרטיסים הם תת-הכותרת של h1. */
@@ -8,6 +8,7 @@ interface Props {
 const { job, headingLevel = 3 } = Astro.props;
 const H = `h${headingLevel}` as 'h2' | 'h3';
 const scope = job.employment_scope ? SCOPE_LABEL[job.employment_scope] : null;
+const fieldLabel = job.field ? FIELD_LABEL[job.field] : null;
 const summary = excerpt(job.body);
 ---
 <article class="card"
@@ -15,13 +16,20 @@ const summary = excerpt(job.body);
   data-body={summary}
   data-company={job.company_name ?? ''}
   data-location={job.location ?? ''}
-  data-scope={job.employment_scope ?? ''}>
+  data-scope={job.employment_scope ?? ''}
+  data-field={job.field ?? ''}>
   <a class="hit" href={`/jobs/${job.slug}/`} aria-label={`למשרה: ${job.title}`}></a>
   <div class="top">
     <H>{job.title}</H>
     {isFresh(job) && <span class="tag tag-new">חדש</span>}
   </div>
   <ul class="meta">
+    {fieldLabel && (
+      <li>
+        <span aria-hidden="true">🏷️</span>
+        <span class="visually-hidden">תחום:</span> {fieldLabel}
+      </li>
+    )}
     {job.location && (
       <li>
         <span aria-hidden="true">📍</span>

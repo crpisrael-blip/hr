@@ -97,6 +97,14 @@ export const APP_STAGE: Record<string, string> = {
 export const SCOPE: Record<string, string> = {
   full_time: 'מלאה', part_time: 'חלקית', temporary: 'זמני', contract: 'חוזה', student: 'סטודנט',
 };
+// תחום המשרה (קטגוריה). מקביל ל-enum app.job_field ולמפה שבאתר הציבורי.
+export const JOB_FIELD: Record<string, string> = {
+  software: 'הייטק ותוכנה', engineering: 'הנדסה', finance: 'כספים וכלכלה',
+  sales_marketing: 'מכירות ושיווק', customer_service: 'שירות ותמיכה',
+  industry: 'ייצור ותעשייה', construction: 'בינוי ותשתיות', logistics: 'לוגיסטיקה ותפעול',
+  healthcare: 'בריאות ורפואה', education: 'חינוך והדרכה',
+  hr_admin: 'משאבי אנוש ואדמיניסטרציה', management: 'ניהול', other: 'אחר',
+};
 export const COMMISSION_BASE: Record<string, string> = { monthly: 'חודשי', annual: 'שנתי' };
 export const PLACEMENT_STATUS: Record<string, string> = {
   pending_start: 'ממתין לתחילת עבודה', working_warranty: 'בתקופת אחריות', approved: 'מאושרת',

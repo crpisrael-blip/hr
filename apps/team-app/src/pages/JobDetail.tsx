@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { JOB_STAGE, APP_STAGE, SCOPE, formatDate, label, money } from '../lib/format';
+import { JOB_STAGE, APP_STAGE, SCOPE, JOB_FIELD, formatDate, label, money } from '../lib/format';
 import { useLoad, unwrap } from '../lib/useLoad';
 import { toUserMessage } from '../lib/errors';
 import PageHead from '../components/PageHead';
@@ -18,7 +18,7 @@ const NEXT: Record<string, { to: string; label: string; primary?: boolean }[]> =
 };
 
 interface Job {
-  id: string; title: string; stage: string; location: string | null; employment_scope: string | null;
+  id: string; title: string; stage: string; location: string | null; employment_scope: string | null; field: string | null;
   headcount: number; salary_min: number | null; salary_max: number | null; opened_at: string | null;
   closed_at: string | null; internal_description: string | null; must_have: string | null;
   nice_to_have: string | null; custom: Record<string, unknown> | null; company_id: string; recruiter_id: string | null;
@@ -34,7 +34,7 @@ export default function JobDetail() {
 
   const { data, err: loadErr, loading, reload } = useLoad(async () => {
     const job = unwrap(await supabase.from('jobs')
-      .select('id, title, stage, location, employment_scope, headcount, salary_min, salary_max, opened_at, closed_at, internal_description, must_have, nice_to_have, custom, company_id, recruiter_id, companies(name), employees!recruiter_id(full_name), job_publications(id, status)')
+      .select('id, title, stage, location, employment_scope, field, headcount, salary_min, salary_max, opened_at, closed_at, internal_description, must_have, nice_to_have, custom, company_id, recruiter_id, companies(name), employees!recruiter_id(full_name), job_publications(id, status)')
       .eq('id', id).maybeSingle()) as unknown as Job | null;
     if (!job) throw { code: 'PGRST116', message: 'job not found' };
     const [ap, lg] = await Promise.all([
@@ -93,6 +93,7 @@ export default function JobDetail() {
               <dt>מגייס אחראי</dt><dd>{j.employees?.full_name ?? '—'}</dd>
               <dt>מיקום</dt><dd>{j.location ?? '—'}</dd>
               <dt>היקף</dt><dd>{j.employment_scope ? label(SCOPE, j.employment_scope) : '—'}</dd>
+              <dt>תחום</dt><dd>{j.field ? label(JOB_FIELD, j.field) : '—'}</dd>
               <dt>תקנים</dt><dd>{j.headcount}</dd>
               <dt>טווח שכר</dt><dd>{salary}</dd>
               <dt>נפתחה</dt><dd>{formatDate(j.opened_at)}</dd>

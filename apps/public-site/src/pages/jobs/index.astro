@@ -1,10 +1,11 @@
 ---
 import Base from '../../layouts/Base.astro';
 import JobCard from '../../components/JobCard.astro';
-import { loadJobs, locationsOf, SCOPE_LABEL } from '../../data/jobs';
+import { loadJobs, locationsOf, fieldsOf, SCOPE_LABEL, FIELD_LABEL } from '../../data/jobs';
 import { SITE } from '../../data/site';
 const jobs = await loadJobs();
 const locations = locationsOf(jobs);
+const fields = fieldsOf(jobs);
 const scopes = [...new Set(jobs.map(j => j.employment_scope).filter(Boolean))] as string[];
 const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרות`);
 ---
@@ -21,6 +22,13 @@ const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרו�
       <div class="field grow">
         <label class="visually-hidden" for="q">חיפוש לפי תפקיד, חברה או מילת מפתח</label>
         <input type="search" id="q" placeholder="חיפוש לפי תפקיד, חברה או מילת מפתח…" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="visually-hidden" for="field">תחום</label>
+        <select id="field">
+          <option value="">כל התחומים</option>
+          {fields.map(f => <option value={f}>{FIELD_LABEL[f]}</option>)}
+        </select>
       </div>
       <div class="field">
         <label class="visually-hidden" for="loc">מיקום</label>
@@ -51,6 +59,7 @@ const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרו�
 
 <script>
   const q = document.getElementById('q') as HTMLInputElement;
+  const field = document.getElementById('field') as HTMLSelectElement;
   const loc = document.getElementById('loc') as HTMLSelectElement;
   const scope = document.getElementById('scope') as HTMLSelectElement;
   const cards = [...document.querySelectorAll<HTMLElement>('#grid .card')];
@@ -58,6 +67,23 @@ const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרו�
   const noResults = document.getElementById('noresults')!;
 
   const label = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרות`);
+
+  // ערך אופציה קיים בלבד — כדי לא "לנעול" מסנן לערך שאין לו אף משרה.
+  function setIfValid(el: HTMLSelectElement | HTMLInputElement, val: string | null) {
+    if (!val) return;
+    if (el instanceof HTMLSelectElement) {
+      if ([...el.options].some(o => o.value === val)) el.value = val;
+    } else {
+      el.value = val;
+    }
+  }
+
+  // אתחול מסננים מפרמטרי ה-URL (מגיעים מחיפוש ההירו בעמוד הבית או משבב תחום).
+  const params = new URLSearchParams(location.search);
+  setIfValid(q, params.get('q'));
+  setIfValid(field, params.get('field'));
+  setIfValid(loc, params.get('loc'));
+  setIfValid(scope, params.get('scope'));
 
   function apply() {
     const term = q.value.trim().toLowerCase();
@@ -68,16 +94,18 @@ const countLabel = (n: number) => (n === 1 ? 'משרה אחת' : `${n} משרו�
       const haystack = [c.dataset.title, c.dataset.body, c.dataset.company, c.dataset.location]
         .join(' ').toLowerCase();
       const okText = !term || haystack.includes(term);
+      const okField = !field.value || c.dataset.field === field.value;
       const okLoc = !loc.value || c.dataset.location === loc.value;
       const okScope = !scope.value || c.dataset.scope === scope.value;
-      const show = okText && okLoc && okScope;
+      const show = okText && okField && okLoc && okScope;
       c.hidden = !show;
       if (show) shown++;
     }
     count.textContent = label(shown);
     noResults.hidden = shown !== 0;
   }
-  [q, loc, scope].forEach(el => el.addEventListener('input', apply));
+  [q, field, loc, scope].forEach(el => el.addEventListener('input', apply));
+  apply();
 </script>
 
 <style>

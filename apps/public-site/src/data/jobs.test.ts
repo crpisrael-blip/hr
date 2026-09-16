@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   type Job,
   SCOPE_LABEL,
+  FIELD_LABEL,
   excerpt,
+  fieldsOf,
   isFresh,
   isRemoteLocation,
   isoDate,
@@ -16,6 +18,7 @@ const job = (over: Partial<Job> = {}): Job => ({
   body: 'תיאור',
   location: 'תל אביב',
   employment_scope: 'full_time',
+  field: 'software',
   company_name: 'חברה',
   published_at: '2026-09-01T00:00:00.000Z',
   ...over,
@@ -109,5 +112,29 @@ describe('SCOPE_LABEL', () => {
   it('תוויות עבריות להיקפי משרה', () => {
     expect(SCOPE_LABEL.full_time).toBe('משרה מלאה');
     expect(SCOPE_LABEL.student).toBe('משרת סטודנט');
+  });
+});
+
+describe('fieldsOf', () => {
+  it('תחומים ייחודיים שיש להם משרות, בסדר הקטלוג', () => {
+    const jobs = [
+      job({ field: 'finance' }),
+      job({ field: 'software' }),
+      job({ field: 'finance' }),
+      job({ field: null }),
+    ];
+    // software מופיע בקטלוג לפני finance → הסדר נשמר לפי הקטלוג, לא לפי המופע.
+    expect(fieldsOf(jobs)).toEqual(['software', 'finance']);
+  });
+
+  it('מערך ריק כשאין תחומים', () => {
+    expect(fieldsOf([job({ field: null })])).toEqual([]);
+  });
+});
+
+describe('FIELD_LABEL', () => {
+  it('תוויות עבריות לתחומים', () => {
+    expect(FIELD_LABEL.software).toBe('הייטק ותוכנה');
+    expect(FIELD_LABEL.other).toBe('אחר');
   });
 });
