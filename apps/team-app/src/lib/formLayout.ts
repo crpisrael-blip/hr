@@ -2,7 +2,7 @@
 // הפריסה (סדר/הסתרה/תווית/רוחב) נשמרת ב-app.form_layouts כמערך slots לפי סדר.
 // אין שורה = ברירת המחדל שבקוד (JOB_BUILTINS) ואחריה השדות המותאמים.
 import { supabase } from './supabase';
-import { COMPANY_STATUS, TASK_PRIORITY, TASK_COMPLETION, ROLE, EMP_STATUS } from './format';
+import { COMPANY_STATUS, TASK_PRIORITY, TASK_COMPLETION, ROLE, EMP_STATUS, JOB_FIELD } from './format';
 import type { CustomField } from '../components/CustomFields';
 
 export type FieldWidget =
@@ -42,6 +42,7 @@ export const JOB_BUILTINS: BuiltinField[] = [
   { column: 'internal_description', label: 'תיאור פנימי', widget: 'textarea', width: 'full' },
   { column: 'location',             label: 'מיקום',       widget: 'text',     width: 'half' },
   { column: 'employment_scope',     label: 'היקף',        widget: 'scope',    width: 'half' },
+  { column: 'field',                label: 'תחום',        widget: 'select',   width: 'half', options: opts(JOB_FIELD) },
   { column: 'headcount',            label: 'תקנים',       widget: 'number',   width: 'third' },
   { column: 'salary_min',           label: 'שכר מ־',      widget: 'number',   width: 'third' },
   { column: 'salary_max',           label: 'שכר עד',      widget: 'number',   width: 'third' },

@@ -1,10 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
 import JobCard from '../components/JobCard.astro';
-import { loadJobs } from '../data/jobs';
+import { loadJobs, fieldsOf, locationsOf, FIELD_LABEL } from '../data/jobs';
 import { SITE } from '../data/site';
 const jobs = await loadJobs();
 const latest = jobs.slice(0, 6);
+const locations = locationsOf(jobs);
+const fields = fieldsOf(jobs);
+const popularFields = fields.slice(0, 8);
+const jobsCount = jobs.length.toLocaleString('he-IL');
 const origin = new URL('/', Astro.site).href;
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -25,12 +29,50 @@ const jsonLd = {
   <section class="hero">
     <div class="page">
       <p class="eyebrow">גיוס והשמה</p>
-      <h1>המשרה הבאה שלכם מתחילה כאן</h1>
-      <p class="lede measure">אנחנו מחברים בין מועמדים למעסיקים בתהליך אישי ומקצועי. עיינו במשרות הפתוחות, הגישו מועמדות בכמה דקות, וקבלו ליווי צמוד עד החתימה.</p>
-      <div class="cta">
-        <a href="/jobs/" class="btn btn-primary">עיון בכל המשרות</a>
-        <a href="#latest" class="btn btn-quiet">המשרות החדשות</a>
-      </div>
+      <h1>בואו נמצא את התפקיד הבא</h1>
+      <p class="lede measure">חיפשתי. מצאתי. הגשתי. עיינו במשרות הפתוחות, סננו לפי תחום ומיקום, והגישו מועמדות בכמה דקות.</p>
+
+      <form class="jobsearch" role="search" method="get" action="/jobs/" aria-label="חיפוש משרות">
+        <div class="row">
+          <div class="field grow">
+            <span class="ic" aria-hidden="true">🔎</span>
+            <label class="visually-hidden" for="q">תפקיד, תחום או מילת מפתח</label>
+            <input type="search" id="q" name="q" placeholder="תפקיד, תחום או עיר…" autocomplete="off" />
+          </div>
+          <button type="submit" class="btn btn-primary search-btn">חיפוש</button>
+        </div>
+        <div class="row selects">
+          <div class="field">
+            <label class="visually-hidden" for="field">תחום</label>
+            <select id="field" name="field">
+              <option value="">כל התחומים</option>
+              {fields.map(f => <option value={f}>{FIELD_LABEL[f]}</option>)}
+            </select>
+          </div>
+          <div class="field">
+            <label class="visually-hidden" for="loc">מיקום</label>
+            <select id="loc" name="loc">
+              <option value="">כל המיקומים</option>
+              {locations.map(l => <option value={l}>{l}</option>)}
+            </select>
+          </div>
+        </div>
+      </form>
+
+      {jobs.length > 0 && (
+        <p class="count-pill"><span class="dot" aria-hidden="true"></span><strong>{jobsCount}</strong> משרות פתוחות עכשיו</p>
+      )}
+
+      {popularFields.length > 0 && (
+        <div class="chips">
+          <span class="chips-label">תחומים פופולריים</span>
+          <ul>
+            {popularFields.map(f => (
+              <li><a href={`/jobs/?field=${f}`}>{FIELD_LABEL[f]}</a></li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   </section>
 
@@ -64,8 +106,49 @@ const jsonLd = {
   .eyebrow { color: var(--brand); font-weight: 600; letter-spacing: .04em; font-size: .85rem; }
   .hero h1 { margin-block: 8px 16px; max-width: 16ch; }
   .lede { color: var(--ink-mid); font-size: 1.12rem; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-block-start: 24px; }
+
+  .jobsearch { margin-block-start: 24px; max-width: 720px; display: grid; gap: 12px; }
+  .jobsearch .row { display: flex; gap: 12px; }
+  .jobsearch .row.selects { flex-wrap: wrap; }
+  .jobsearch .field { position: relative; display: flex; align-items: center; }
+  .jobsearch .field.grow { flex: 1 1 auto; }
+  .jobsearch .field.selects, .jobsearch .selects .field { flex: 1 1 200px; }
+  .jobsearch .ic { position: absolute; inset-inline-start: 14px; pointer-events: none; opacity: .6; font-size: 1rem; }
+  .jobsearch input[type="search"] {
+    inline-size: 100%; padding: 14px 44px 14px 16px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface-card);
+    box-shadow: var(--shadow-sm);
+  }
+  .jobsearch select {
+    inline-size: 100%; padding: 12px 16px; font-size: .98rem;
+    border: 1px solid var(--line); border-radius: 14px; background: var(--surface-card);
+  }
+  .jobsearch input:focus-visible, .jobsearch select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .search-btn { flex: 0 0 auto; border-radius: 999px; padding-inline: 28px; font-size: 1rem; }
+
+  .count-pill {
+    display: inline-flex; align-items: center; gap: 8px; margin-block-start: 18px;
+    padding: 8px 16px; background: var(--surface-card); border: 1px solid var(--line);
+    border-radius: 999px; color: var(--ink-mid); font-size: .95rem; box-shadow: var(--shadow-sm);
+  }
+  .count-pill strong { color: var(--ink); }
+  .count-pill .dot { inline-size: 9px; block-size: 9px; border-radius: 50%; background: #16a34a; }
+
+  .chips { margin-block-start: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .chips-label { color: var(--ink-soft); font-size: .85rem; font-weight: 600; }
+  .chips ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips a {
+    display: inline-block; padding: 7px 14px; border-radius: 999px; font-size: .88rem;
+    background: var(--brand-soft); color: var(--brand-ink); border: 1px solid transparent;
+    transition: border-color .14s ease, background .14s ease;
+  }
+  .chips a:hover { border-color: var(--brand); }
+
   .latest { margin-block-start: 48px; }
+  @media (max-width: 560px) {
+    .jobsearch .row:not(.selects) { flex-wrap: wrap; }
+    .search-btn { inline-size: 100%; }
+  }
   .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-block-end: 20px; }
   .more { font-weight: 600; white-space: nowrap; }
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
